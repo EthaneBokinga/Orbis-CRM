@@ -27,7 +27,7 @@ exports.getAdminStats = async (req, res) => {
 // === 2. LISTE DES COMMERCIAUX AVEC NB DE DEALS ===
 exports.getCommercials = async (req, res) => {
   try {
-    const commercials = await User.find({ role: 'commercial', isActive: true }).select('name email role');
+    const commercials = await User.find({ role: 'commercial' }).select('name email role isActive');
 
     // Agrégation du nombre de deals par commercial
     const dealCounts = await Deal.aggregate([
@@ -44,6 +44,7 @@ exports.getCommercials = async (req, res) => {
       name: c.name,
       email: c.email,
       role: c.role,
+      isActive: c.isActive !== false, // Valeur par défaut true
       dealCount: countMap[c._id.toString()] || 0
     }));
 
@@ -92,9 +93,137 @@ exports.reassignDeal = async (req, res) => {
 
     deal.ownedBy = newCommercialId;
     await deal.save();
-
+ 
     res.json({ message: `Deal réattribué à ${newCommercial.name} avec succès.`, deal });
   } catch (err) {
     res.status(500).json({ error: "Erreur réattribution." });
   }
 };
+ 
+// === 5. CRÉATION D'UN DEAL DEPUIS LA CONSOLE ADMIN (POST /deals) ===
+exports.createDeal = async (req, res) => {
+  try {
+    const { title, company, amount, assignedTo } = req.body;
+    if (!title || !company || !amount || !assignedTo) {
+      return res.status(400).json({ error: "Champs requis manquants." });
+    }
+ 
+    // Valider si le commercial de destination existe et est actif
+    const commercial = await User.findOne({ _id: assignedTo, role: 'commercial', isActive: true });
+    if (!commercial) {
+      return res.status(404).json({ error: "Commercial assigné introuvable ou inactif." });
+    }
+ 
+    // Trouver ou créer automatiquement un contact d'entreprise pour l'association Mongoose obligatoire
+    const Contact = require('../models/Contact');
+    let contact = await Contact.findOne({ company, assignedTo });
+    if (!contact) {
+      contact = new Contact({
+        firstName: "Contact",
+        lastName: company,
+        phone: "+242 06 000 00 00",
+        company: company,
+        assignedTo: assignedTo,
+        createdBy: req.user.id
+      });
+      await contact.save();
+    }
+ 
+    const deal = new Deal({
+      contact: contact._id,
+      title: title.trim(),
+      amount: Number(amount),
+      stage: 'découverte',
+      probability: 10,
+      ownedBy: assignedTo
+    });
+ 
+    await deal.save();
+    res.status(201).json(deal);
+  } catch (err) {
+    console.error("Erreur création deal admin :", err);
+    res.status(500).json({ error: "Erreur lors de la création du deal." });
+  }
+};
+ 
+// === 6. INTÉGRATION / INVITATION D'UN NOUVEAU MEMBRE D'ÉQUIPE (POST /users) ===
+exports.createUser = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Tous les champs requis." });
+    }
+ 
+    const cleanEmail = email.trim().toLowerCase();
+    const userExists = await User.findOne({ email: cleanEmail });
+    if (userExists) {
+      return res.status(400).json({ error: "Cet email est déjà attribué à un autre compte." });
+    }
+ 
+    const newUser = new User({
+      name: name.trim(),
+      email: cleanEmail,
+      passwordHash: password,
+      role: role || 'commercial',
+      authProvider: 'local'
+    });
+ 
+    await newUser.save();
+    
+    // Retourner l'utilisateur sans son mot de passe ou d'autres attributs sensibles
+    res.status(201).json({
+      _id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      dealCount: 0
+    });
+  } catch (err) {
+    console.error("Erreur création utilisateur admin :", err);
+    res.status(500).json({ error: "Erreur lors de la création de l'utilisateur." });
+  }
+};
+ 
+// === 7. SUPPRESSION / ARCHIVAGE D'UN MARCHÉ (DELETE /deals/:id) ===
+exports.deleteDeal = async (req, res) => {
+  try {
+    const deal = await Deal.findByIdAndDelete(req.params.id);
+    if (!deal) {
+      return res.status(404).json({ error: "Opportunité de vente introuvable." });
+    }
+    res.json({ message: "Le deal a été supprimé du marché avec succès." });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur lors de la suppression." });
+  }
+};
+
+// === 8. ACTIVER / SUSPENDRE UN COMPTE UTILISATEUR (PUT /users/:id/toggle-status) ===
+exports.toggleUserStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    }
+    if (user._id.toString() === req.user.id) {
+      return res.status(400).json({ error: "Action interdite : vous ne pouvez pas suspendre votre propre compte administrateur." });
+    }
+
+    user.isActive = !user.isActive;
+    await user.save();
+    
+    res.json({
+      message: `Le compte de ${user.name} a été ${user.isActive ? 'réactivé' : 'suspendu'} avec succès.`,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive
+      }
+    });
+  } catch (err) {
+    console.error("Erreur suspension utilisateur :", err);
+    res.status(500).json({ error: "Erreur lors du changement de statut." });
+  }
+};
+

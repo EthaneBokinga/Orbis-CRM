@@ -44,7 +44,7 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email: cleanEmail, isActive: true }).select('+passwordHash');
 
-    if (!user || user.authProvider !== 'local' || !(await user.comparePassword(password))) {
+    if (!user || !user.passwordHash || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Identifiants incorrects ou invalides.' });
     }
 
@@ -96,8 +96,16 @@ exports.googleLogin = async (req, res) => {
         avatarUrl,
         role: 'commercial'
       });
-    } else if (user.authProvider !== 'google') {
-      return res.status(400).json({ error: 'Ce compte existe déjà avec une méthode de connexion classique.' });
+    } else {
+      // Si le compte existe de manière classique, on l'associe avec Google
+      if (!user.googleId) {
+        user.googleId = googleId;
+      }
+      if (!user.avatarUrl && avatarUrl) {
+        user.avatarUrl = avatarUrl;
+      }
+      // On sauvegarde l'association
+      await user.save();
     }
 
     if (!user.isActive) return res.status(403).json({ error: 'Compte révoqué par la direction.' });
@@ -178,3 +186,31 @@ exports.logout = async (req, res) => {
   res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'Strict', secure: process.env.NODE_ENV === 'production' });
   res.json({ message: 'Session purgée.' });
 };
+
+// Mise à jour du profil (Nom et Photo / Avatar)
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, avatarUrl } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "Utilisateur non trouvé." });
+
+    if (name) user.name = name.trim();
+    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+
+    await user.save();
+
+    res.json({
+      message: "Profil mis à jour avec succès.",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur lors de la mise à jour du profil." });
+  }
+};
+

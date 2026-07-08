@@ -29,20 +29,23 @@ connectDB().then(() => {
 
 async function seedAdminIfMissing() {
   try {
-    const adminExists = await User.findOne({ role: 'admin' });
+    // Supprimer l'ancien admin de test s'il existe
+    await User.deleteOne({ email: 'admin@orbis-crm.com' });
+
+    const adminExists = await User.findOne({ email: 'ethanebokinga00@gmail.com' });
     if (!adminExists) {
       const adminUser = new User({
-        name: 'Administrateur Orbis',
-        email: 'admin@orbis-crm.com',
-        passwordHash: 'Admin123@',
+        name: 'Ethan Bokinga (Admin)',
+        email: 'ethanebokinga00@gmail.com',
+        passwordHash: 'NTHBG1234@',
         authProvider: 'local',
         role: 'admin',
         isActive: true
       });
       await adminUser.save();
-      console.log('=== ORBIS SEEDER === ✓ Compte Admin de secours créé : admin@orbis-crm.com / Admin123@');
+      console.log('=== ORBIS SEEDER === ✓ Compte Admin créé : ethanebokinga00@gmail.com / NTHBG1234@');
     } else {
-      console.log('=== ORBIS SEEDER === ✓ Admin existant détecté. Aucun seeding nécessaire.');
+      console.log('=== ORBIS SEEDER === ✓ Admin existant détecté (ethanebokinga00@gmail.com).');
     }
   } catch (err) {
     console.error('=== ORBIS SEEDER === ✗ Erreur lors du seeding admin :', err.message);

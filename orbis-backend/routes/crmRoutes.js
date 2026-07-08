@@ -25,4 +25,8 @@ router.put('/deals/:id/stage', crmController.updateDealStage);
 // Route Dashboard Analytique
 router.get('/dashboard/stats', crmController.getDashboardStats);
 
+// Routes Administration (Supervision)
+const adminRoutes = require('./adminRoutes');
+router.use('/admin', adminRoutes);
+
 module.exports = router;

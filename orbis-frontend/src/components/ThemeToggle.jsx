@@ -4,9 +4,9 @@ import { Sun, Moon, Monitor } from 'lucide-react';
 
 // Labels et icônes pour chaque état du thème tri-state
 const THEME_CONFIG = {
-  dark:   { icon: <Moon size={16} className="text-indigo-400" />,  label: 'Sombre',  next: 'Clair'   },
-  light:  { icon: <Sun size={16} className="text-amber-500" />,    label: 'Clair',   next: 'Système'  },
-  system: { icon: <Monitor size={16} className="text-emerald-400" />, label: 'Système', next: 'Sombre' }
+  dark:   { icon: <Moon size={14} />,    label: 'Sombre',  color: 'text-indigo-400'  },
+  light:  { icon: <Sun size={14} />,     label: 'Clair',   color: 'text-amber-400'   },
+  system: { icon: <Monitor size={14} />, label: 'Système', color: 'text-emerald-400' }
 };
 
 const ThemeToggle = () => {
@@ -17,16 +17,15 @@ const ThemeToggle = () => {
     <button
       id="theme-toggle-btn"
       onClick={cycleTheme}
-      title={`Mode actuel : ${config.label} — Cliquer pour passer en mode ${config.next}`}
-      className="fixed top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-xl
-                 bg-white/80 dark:bg-midnight-card/80 backdrop-blur-sm
-                 border border-gray-200 dark:border-midnight-border
-                 shadow-md hover:shadow-lg
-                 text-gray-700 dark:text-gray-300
-                 transition-all duration-200 hover:scale-105 active:scale-95"
+      title={`Mode : ${config.label} — cliquer pour changer`}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                 bg-slate-900 border border-slate-800
+                 hover:border-slate-700 hover:bg-slate-800
+                 ${config.color}
+                 transition-all duration-200 text-xs font-semibold select-none`}
     >
       {config.icon}
-      <span className="text-[11px] font-semibold hidden sm:block">{config.label}</span>
+      <span className="hidden sm:block">{config.label}</span>
     </button>
   );
 };

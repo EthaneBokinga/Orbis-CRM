@@ -13,8 +13,6 @@ const userSchema = new mongoose.Schema({
   refreshTokenHash: { type: String, select: false }
 }, { timestamps: true });
 
-userSchema.index({ googleId: 1 }, { sparse: true });
-
 userSchema.pre('save', async function(next) {
   if (!this.isModified('passwordHash') || !this.passwordHash) return next();
   try {

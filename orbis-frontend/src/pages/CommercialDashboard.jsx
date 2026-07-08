@@ -1,10 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/UI/Toast';
+import ThemeToggle from '../components/ThemeToggle';
 
-const API_URL = "http://localhost:5000/api/crm";
+const API_URL = "http://localhost:5001/api/crm";
 
 export default function CommercialDashboard({ onLogout }) {
   const { showToast } = useToast();
+  
+  const handleLogout = onLogout || (() => {
+    localStorage.clear();
+    window.location.href = '/';
+  });
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user')) || { name: 'Utilisateur', email: '', role: 'commercial', avatarUrl: '' };
+    } catch (e) {
+      return { name: 'Utilisateur', email: '', role: 'commercial', avatarUrl: '' };
+    }
+  });
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileName, setProfileName] = useState(currentUser.name);
+  const [profileAvatar, setProfileAvatar] = useState(currentUser.avatarUrl || '');
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      showToast("Le nom est requis.", "warning");
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const response = await fetch("http://localhost:5001/api/auth/profile", {
+        method: 'PUT',
+        ...getAuthHeader(),
+        body: JSON.stringify({ name: profileName, avatarUrl: profileAvatar })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setCurrentUser(data.user);
+        setShowProfileModal(false);
+        showToast("Profil mis à jour !", "success");
+      } else {
+        showToast(data.error || "Erreur de mise à jour.", "error");
+      }
+    } catch (err) {
+      showToast("Erreur réseau.", "error");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("L'image ne doit pas dépasser 2 Mo.", "warning");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileAvatar(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
   
   // --- États fondamentaux ---
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | contacts | kanban
@@ -208,13 +270,8 @@ export default function CommercialDashboard({ onLogout }) {
       {/* ================= BARRE DE NAVIGATION PREMIUM ================= */}
       <nav className="sticky top-0 z-40 border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20 transform group-hover:scale-105 transition-transform duration-300">
-              <span className="text-slate-950 font-black text-lg">O</span>
-            </div>
-            <span className="font-bold tracking-wider text-xl bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              ORBIS <span className="text-teal-400 font-medium text-sm tracking-widest ml-1">CRM</span>
-            </span>
+          <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => { setActiveTab('dashboard'); setSelectedContact(null); }}>
+            <img src="/outpout/wordmark/wordmark-transparent.png" alt="Orbis CRM" className="h-8 object-contain transform group-hover:scale-102 transition-transform duration-200" />
           </div>
           
           <div className="flex items-center space-x-1 bg-slate-900/60 border border-slate-800/80 p-1 rounded-xl">
@@ -238,13 +295,28 @@ export default function CommercialDashboard({ onLogout }) {
             </button>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="hidden md:flex flex-col text-right">
-              <span className="text-sm font-medium text-slate-200">Espace Commercial</span>
-              <span className="text-xs text-teal-400 font-mono tracking-tight">Performances Live</span>
+          <div className="flex items-center space-x-3">
+            <ThemeToggle className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all duration-200 text-xs font-semibold" />
+
+            <div 
+              onClick={() => { setProfileName(currentUser.name); setProfileAvatar(currentUser.avatarUrl || ''); setShowProfileModal(true); }}
+              className="flex items-center space-x-2.5 bg-slate-900 hover:bg-slate-850/80 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer transition-all duration-200 select-none"
+            >
+              {currentUser.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-teal-500/30" />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-[10px] font-black text-slate-950">
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="hidden md:flex flex-col text-left">
+                <span className="text-xs font-semibold text-slate-200 leading-none">{currentUser.name}</span>
+                <span className="text-[9px] text-teal-400 font-mono capitalize leading-none mt-1">{currentUser.role}</span>
+              </div>
             </div>
+
             <button 
-              onClick={onLogout}
+              onClick={handleLogout}
               className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 text-xs font-semibold transition-all duration-200"
             >
               Déconnexion
@@ -592,39 +664,88 @@ export default function CommercialDashboard({ onLogout }) {
       {/* ================= MODAL AJOUT CONTACT ================= */}
       {showContactModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">Ajouter un nouveau prospect</h3>
-              <button onClick={() => setShowContactModal(false)} className="text-slate-400 hover:text-white">✕</button>
+          <div className="w-full max-w-md rounded-2xl border border-slate-700/60 bg-slate-900 p-6 shadow-2xl shadow-slate-950 space-y-5">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                  <span className="text-teal-400 text-sm">＋</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white leading-none">Nouveau Prospect</h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Renseignez les informations de contact</p>
+                </div>
+              </div>
+              <button onClick={() => setShowContactModal(false)} className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors text-sm">✕</button>
             </div>
             
             <form onSubmit={handleCreateContact} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Prénom *</label>
-                  <input type="text" required value={newContact.firstName} onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-500" />
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Prénom *</label>
+                  <input
+                    type="text" required
+                    placeholder="ex: Landry"
+                    value={newContact.firstName}
+                    onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                  />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Nom *</label>
-                  <input type="text" required value={newContact.lastName} onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-500" />
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Nom *</label>
+                  <input
+                    type="text" required
+                    placeholder="ex: Maboukou"
+                    value={newContact.lastName}
+                    onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                  />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Entreprise</label>
-                <input type="text" value={newContact.company} onChange={(e) => setNewContact({ ...newContact, company: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-500" />
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Entreprise</label>
+                <input
+                  type="text"
+                  placeholder="ex: Groupe BGFI, Société Nationale..."
+                  value={newContact.company}
+                  onChange={(e) => setNewContact({ ...newContact, company: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Téléphone *</label>
-                <input type="text" required value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-500" />
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Téléphone *</label>
+                <input
+                  type="text" required
+                  placeholder="ex: +242 06 000 00 00"
+                  value={newContact.phone}
+                  onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
-                <input type="email" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-teal-500" />
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Adresse Email <span className="text-slate-600 normal-case">(optionnel)</span></label>
+                <input
+                  type="email"
+                  placeholder="ex: contact@entreprise.com"
+                  value={newContact.email}
+                  onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                />
               </div>
 
               <div className="flex space-x-3 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setShowContactModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-800 text-sm text-slate-400 hover:text-white">Annuler</button>
-                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold text-sm">Créer le lead</button>
+                <button
+                  type="button"
+                  onClick={() => setShowContactModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 hover:border-slate-700 text-sm text-slate-400 hover:text-white transition-all duration-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold text-sm hover:opacity-90 active:scale-95 transition-all duration-200 shadow-lg shadow-teal-500/20"
+                >
+                  Créer le lead
+                </button>
               </div>
             </form>
           </div>
@@ -715,6 +836,71 @@ export default function CommercialDashboard({ onLogout }) {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PROFIL UTILISATEUR ================= */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <form onSubmit={handleUpdateProfile} className="w-full max-w-sm rounded-2xl border border-slate-700/60 bg-slate-900 p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">Mon Profil</h3>
+              <button type="button" onClick={() => setShowProfileModal(false)} className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+            </div>
+            
+            <div className="flex flex-col items-center space-y-2 py-2">
+              <div className="relative group cursor-pointer">
+                {profileAvatar ? (
+                  <img src={profileAvatar} alt="Aperçu" className="w-20 h-20 rounded-full object-cover border-2 border-teal-500/40 group-hover:opacity-75 transition-opacity" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-2xl font-black text-slate-950 group-hover:opacity-75 transition-opacity">
+                    {profileName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white font-bold cursor-pointer select-none">
+                  Modifier
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-500">Image carrée recommandée · max 2 Mo</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Nom Complet</label>
+              <input
+                type="text" required
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Adresse Email</label>
+              <input
+                type="text" disabled
+                value={currentUser.email}
+                className="w-full bg-slate-950/60 border border-slate-800/60 rounded-xl px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-800 text-xs text-slate-400 hover:text-white transition-all duration-200"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={profileSaving}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold text-xs hover:opacity-90 disabled:opacity-40 transition-all duration-200 shadow-lg shadow-teal-500/20"
+              >
+                {profileSaving ? 'Enregistrement...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

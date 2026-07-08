@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
+import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
 
-const API_AUTH_URL = "http://localhost:5000/api/auth";
+const API_AUTH_URL = "http://localhost:5001/api/auth";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,6 +30,7 @@ const STRENGTH_CONFIG = {
 
 export default function AuthPage({ onLoginSuccess }) {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -90,8 +92,10 @@ export default function AuthPage({ onLoginSuccess }) {
       if (isLogin) {
         localStorage.setItem('token', data.accessToken);
         localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('userRole', data.user.role);
         showToast('Connexion réussie !', 'success');
-        onLoginSuccess(data);
+        if (onLoginSuccess) onLoginSuccess(data);
+        navigate(data.user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
       } else {
         showToast('Compte créé avec succès ! Connectez-vous.', 'success');
         setIsLogin(true);
@@ -122,8 +126,10 @@ export default function AuthPage({ onLoginSuccess }) {
 
       localStorage.setItem('token', data.accessToken);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('userRole', data.user.role);
       showToast('Connexion Google réussie !', 'success');
-      onLoginSuccess(data);
+      if (onLoginSuccess) onLoginSuccess(data);
+      navigate(data.user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
 
     } catch (err) {
       showToast(err.message, 'error');
@@ -144,9 +150,7 @@ export default function AuthPage({ onLoginSuccess }) {
         
         {/* HEADER LOGO */}
         <div className="text-center space-y-2">
-          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-500 items-center justify-center shadow-lg shadow-teal-500/20 mb-2">
-            <span className="text-slate-950 font-black text-2xl">O</span>
-          </div>
+          <img src="/outpout/icons/icon-transparent-192x192.png" alt="Orbis Logo" className="mx-auto w-14 h-14 object-contain mb-2 drop-shadow-md animate-pulse" />
           <h2 className="text-2xl font-extrabold text-white tracking-tight">
             {isLogin ? "Ravi de vous revoir" : "Rejoindre Orbis CRM"}
           </h2>
