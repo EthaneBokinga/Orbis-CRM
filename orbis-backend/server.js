@@ -11,8 +11,21 @@ const User = require('./models/User');
 const app = express();
 
 app.use(helmet());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(o => origin.startsWith(o))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bloqué par la sécurité CORS Orbis'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());

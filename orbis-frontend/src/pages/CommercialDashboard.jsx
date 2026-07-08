@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/UI/Toast';
 import ThemeToggle from '../components/ThemeToggle';
+import ActivityTimeline from '../components/ActivityTimeline';
 
-const API_URL = "http://localhost:5001/api/crm";
+const API_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/crm` 
+  : "http://localhost:5001/api/crm";
+
+const API_AUTH_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/auth` 
+  : "http://localhost:5001/api/auth";
 
 export default function CommercialDashboard({ onLogout }) {
   const { showToast } = useToast();
@@ -33,7 +40,7 @@ export default function CommercialDashboard({ onLogout }) {
     }
     setProfileSaving(true);
     try {
-      const response = await fetch("http://localhost:5001/api/auth/profile", {
+      const response = await fetch(`${API_AUTH_URL}/profile`, {
         method: 'PUT',
         ...getAuthHeader(),
         body: JSON.stringify({ name: profileName, avatarUrl: profileAvatar })
@@ -80,6 +87,7 @@ export default function CommercialDashboard({ onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showContactModal, setShowContactModal] = useState(false);
   const [showDealModal, setShowDealModal] = useState(false);
+  const [selectedDeal, setSelectedDeal]   = useState(null); // Pour la timeline Vue 360°
   
   // --- États Formulaires ---
   const [newContact, setNewContact] = useState({ firstName: '', lastName: '', company: '', phone: '', email: '', status: 'à_contacter' });
@@ -624,30 +632,35 @@ export default function CommercialDashboard({ onLogout }) {
                             </div>
 
                             {/* Controles Kanban */}
-                            <div className="flex items-center justify-end space-x-1 pt-2 border-t border-slate-800/50 mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                              {stage !== 'découverte' && (
-                                <button 
-                                  onClick={() => {
-                                    const stages = ['découverte', 'proposition', 'négociation', 'gagné'];
-                                    moveDealStage(deal._id, stages[stages.indexOf(stage) - 1]);
-                                  }}
-                                  className="text-[11px] bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded hover:text-white"
-                                >
-                                  ◀
-                                </button>
-                              )}
-                              {stage !== 'gagné' && (
-                                <button 
-                                  onClick={() => {
-                                    const stages = ['découverte', 'proposition', 'négociation', 'gagné'];
-                                    moveDealStage(deal._id, stages[stages.indexOf(stage) + 1]);
-                                  }}
-                                  className="text-[11px] bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded hover:text-white"
-                                >
-                                  ▶
-                                </button>
-                              )}
-                            </div>
+                             <div className="flex items-center justify-between pt-2 border-t border-slate-800/50 mt-1">
+                               {/* Bouton Vue 360° */}
+                               <button
+                                 onClick={(e) => { e.stopPropagation(); setSelectedDeal(selectedDeal?._id === deal._id ? null : deal); }}
+                                 className={`text-[10px] font-semibold px-2 py-1 rounded-lg border transition-all ${
+                                   selectedDeal?._id === deal._id
+                                     ? 'bg-teal-500/20 border-teal-500/40 text-teal-400'
+                                     : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-teal-400 hover:border-teal-500/30'
+                                 }`}
+                               >
+                                 📋 Vue 360°
+                               </button>
+
+                               {/* Avance / Recule Kanban */}
+                               <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                 {stage !== 'découverte' && (
+                                   <button
+                                     onClick={(e) => { e.stopPropagation(); const s = ['découverte','proposition','négociation','gagné']; moveDealStage(deal._id, s[s.indexOf(stage) - 1]); }}
+                                     className="text-[11px] bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded hover:text-white"
+                                   >◀</button>
+                                 )}
+                                 {stage !== 'gagné' && (
+                                   <button
+                                     onClick={(e) => { e.stopPropagation(); const s = ['découverte','proposition','négociation','gagné']; moveDealStage(deal._id, s[s.indexOf(stage) + 1]); }}
+                                     className="text-[11px] bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded hover:text-white"
+                                   >▶</button>
+                                 )}
+                               </div>
+                             </div>
                           </div>
                         ))
                       )}
@@ -656,6 +669,17 @@ export default function CommercialDashboard({ onLogout }) {
                 );
               })}
             </div>
+
+            {/* ═══ PANNEAU TIMELINE VUE 360° ═══ */}
+            {selectedDeal && (
+              <div className="mt-6 animate-fadeIn">
+                <ActivityTimeline
+                  dealId={selectedDeal._id}
+                  dealTitle={selectedDeal.title}
+                  onClose={() => setSelectedDeal(null)}
+                />
+              </div>
+            )}
           </div>
         )}
 

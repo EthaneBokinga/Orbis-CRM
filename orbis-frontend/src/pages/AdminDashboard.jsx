@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
 import { useToast } from '../components/UI/Toast';
 
-const API_URL = "http://localhost:5001/api/crm/admin"; // Port 5001 pour Orbis CRM
+const API_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/crm/admin` 
+  : "http://localhost:5001/api/crm/admin";
+
+const API_AUTH_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/auth` 
+  : "http://localhost:5001/api/auth";
 
 export default function AdminDashboard() {
   const { showToast } = useToast();
@@ -15,15 +21,22 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
 
   // --- États des Modals & Actions ---
-  const [showDealModal, setShowDealModal] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [selectedDeal, setSelectedDeal] = useState(null);
-  const [newAssigneeId, setNewAssigneeId] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const [showDealModal, setShowDealModal]     = useState(false);
+  const [showUserModal, setShowUserModal]     = useState(false);
+  const [confirmModal, setConfirmModal]       = useState(null); // { message, onConfirm }
+  const [selectedDeal, setSelectedDeal]       = useState(null);
+  const [newAssigneeId, setNewAssigneeId]     = useState('');
+  const [actionLoading, setActionLoading]     = useState(false);
 
   // --- Formulaires de création ---
   const [newDealData, setNewDealData] = useState({ title: '', company: '', amount: '', assignedTo: '' });
   const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'commercial' });
+
+  // --- États Audit & Objectif Mensuel ---
+  const [auditLogs, setAuditLogs]   = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [monthlyGoal, setMonthlyGoal]   = useState('');
+  const [goalSaving, setGoalSaving]     = useState(false);
 
   // --- États de Profil Utilisateur ---
   const [currentUser, setCurrentUser] = useState(() => {
@@ -75,7 +88,45 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData();
+    fetchAuditLogs();
   }, []);
+
+  // === CHARGEMENT DU JOURNAL D'AUDIT ===
+  const fetchAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/logs`, getAuthHeader());
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data.logs || []);
+      }
+    } catch {}
+    finally { setAuditLoading(false); }
+  };
+
+  // === ACTION : MISE À JOUR DE L'OBJECTIF ===
+  const handleUpdateGoal = async (e) => {
+    e.preventDefault();
+    const val = Number(monthlyGoal);
+    if (!val || val <= 0) return showToast("Entrez un objectif valide.", "warning");
+    setGoalSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/settings/goal`, {
+        method: 'PUT',
+        ...getAuthHeader(),
+        body: JSON.stringify({ monthlyGoal: val })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message, "success");
+        setMonthlyGoal('');
+        fetchAuditLogs();
+      } else {
+        showToast(data.error || "Erreur.", "error");
+      }
+    } catch { showToast("Erreur réseau.", "error"); }
+    finally { setGoalSaving(false); }
+  };
 
   // === ACTION : CRÉER UN LEAD (POST) ===
   const handleCreateDeal = async (e) => {
@@ -140,22 +191,26 @@ export default function AdminDashboard() {
   // === ACTION : SUSPENDRE / RÉACTIVER UN COMMERCIAL (PUT) ===
   const handleToggleUserStatus = async (user) => {
     const actionName = user.isActive ? "suspendre" : "réactiver";
-    if (!window.confirm(`Voulez-vous vraiment ${actionName} le compte de ${user.name} ?`)) return;
-    try {
-      const res = await fetch(`${API_URL}/users/${user._id}/toggle-status`, {
-        method: 'PUT',
-        ...getAuthHeader()
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(data.message, "success");
-        fetchAdminData();
-      } else {
-        showToast(data.error || "Erreur lors de la modification du statut.", "error");
+    setConfirmModal({
+      message: `Voulez-vous vraiment ${actionName} le compte de ${user.name} ?`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_URL}/users/${user._id}/toggle-status`, {
+            method: 'PUT',
+            ...getAuthHeader()
+          });
+          const data = await res.json();
+          if (res.ok) {
+            showToast(data.message, "success");
+            fetchAdminData();
+            fetchAuditLogs();
+          } else {
+            showToast(data.error || "Erreur.", "error");
+          }
+        } catch { showToast("Erreur réseau.", "error"); }
+        setConfirmModal(null);
       }
-    } catch (err) {
-      showToast("Erreur réseau.", "error");
-    }
+    });
   };
 
   // === ACTION : MUTATION DE DOSSIER (PUT) ===
@@ -187,22 +242,26 @@ export default function AdminDashboard() {
 
   // === ACTION : SUPPRIMER UN DEAL (DELETE) ===
   const handleDeleteDeal = async (id) => {
-    if (!window.confirm("Retirer définitivement cette opportunité du marché ?")) return;
-    try {
-      const res = await fetch(`${API_URL}/deals/${id}`, {
-        method: 'DELETE',
-        ...getAuthHeader()
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast("Lead supprimé avec succès.", "success");
-        fetchAdminData();
-      } else {
-        showToast(data.error || "Erreur de suppression.", "error");
+    setConfirmModal({
+      message: "Retirer définitivement cette opportunité du marché ?",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_URL}/deals/${id}`, {
+            method: 'DELETE',
+            ...getAuthHeader()
+          });
+          const data = await res.json();
+          if (res.ok) {
+            showToast("Lead supprimé avec succès.", "success");
+            fetchAdminData();
+            fetchAuditLogs();
+          } else {
+            showToast(data.error || "Erreur de suppression.", "error");
+          }
+        } catch { showToast("Erreur réseau.", "error"); }
+        setConfirmModal(null);
       }
-    } catch (err) {
-      showToast("Erreur réseau.", "error");
-    }
+    });
   };
 
   // === ACTION : MISE À JOUR DU PROFIL ===
@@ -214,7 +273,7 @@ export default function AdminDashboard() {
     }
     setProfileSaving(true);
     try {
-      const response = await fetch("http://localhost:5001/api/auth/profile", {
+      const response = await fetch(`${API_AUTH_URL}/profile`, {
         method: 'PUT',
         ...getAuthHeader(),
         body: JSON.stringify({ name: profileName, avatarUrl: profileAvatar })
@@ -699,6 +758,107 @@ export default function AdminDashboard() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ================= SECTION CONFIGURATION & AUDIT ================= */}
+      <section className="max-w-7xl mx-auto px-6 pb-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        {/* — Objectif Mensuel — */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-5">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            Objectif Mensuel de Revenue
+          </h3>
+          <p className="text-xs text-slate-400">Définissez le cap de chiffre d'affaires que l'équipe doit atteindre ce mois-ci. L'objectif s'affiche dans le dashboard des commerciaux.</p>
+          <form onSubmit={handleUpdateGoal} className="flex gap-3">
+            <input
+              type="number"
+              min="1"
+              value={monthlyGoal}
+              onChange={e => setMonthlyGoal(e.target.value)}
+              placeholder="ex : 5 000 000"
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all"
+            />
+            <button
+              type="submit"
+              disabled={goalSaving}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-xs hover:opacity-90 disabled:opacity-50 transition-all shadow-amber-500/20 shadow-md whitespace-nowrap"
+            >
+              {goalSaving ? "Sauvegarde..." : "Appliquer"}
+            </button>
+          </form>
+        </div>
+
+        {/* — Journal d’Audit — */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+              Journal d'Audit
+            </h3>
+            <button onClick={fetchAuditLogs} className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg border border-slate-800 hover:border-slate-700">
+              ⟳ Actualiser
+            </button>
+          </div>
+
+          {auditLoading ? (
+            <div className="flex items-center justify-center h-24 text-slate-500">
+              <div className="w-5 h-5 border-2 border-t-rose-400 border-slate-700 rounded-full animate-spin"></div>
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <p className="text-xs text-slate-600 italic text-center py-4">Aucune action enregistrée.</p>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {auditLogs.map(log => (
+                <div key={log._id} className={`flex items-start gap-3 p-2.5 rounded-xl border ${
+                  log.severity === 'high'    ? 'bg-rose-500/5 border-rose-500/20' :
+                  log.severity === 'warning' ? 'bg-amber-500/5 border-amber-500/20' :
+                  'bg-slate-900/60 border-slate-800/60'
+                }`}>
+                  <span className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    log.severity === 'high' ? 'bg-rose-400' :
+                    log.severity === 'warning' ? 'bg-amber-400' : 'bg-slate-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-300 leading-snug">{log.actionDescription}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                      {log.actorName} &bull; {new Date(log.createdAt).toLocaleString('fr-FR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ================= MODAL CONFIRMATION PERSONNALISÉE ================= */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg flex-shrink-0">⚠️</div>
+              <div>
+                <h4 className="text-sm font-bold text-white mb-1">Confirmation requise</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">{confirmModal.message}</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 py-2.5 border border-slate-800 rounded-xl text-xs text-slate-400 hover:text-white hover:border-slate-700 transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="flex-1 py-2.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white font-bold rounded-xl text-xs hover:opacity-90 transition-all"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
 
-const API_AUTH_URL = "http://localhost:5001/api/auth";
+const API_AUTH_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/auth` 
+  : "http://localhost:5001/api/auth";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

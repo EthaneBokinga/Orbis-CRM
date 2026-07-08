@@ -2,6 +2,14 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Deal = require('../models/Deal');
 const Interaction = require('../models/Interaction');
+const AuditLog = require('../models/AuditLog');
+
+// Helper interne — écrit un log d'audit sans bloquer la réponse
+const logAudit = (actorId, actorName, actionDescription, severity = 'info') => {
+  AuditLog.create({ actorId, actorName, actionDescription, severity }).catch(
+    err => console.warn('[AuditLog] Écriture échouée :', err.message)
+  );
+};
 
 // === 1. STATISTIQUES GLOBALES (vue Direction) ===
 exports.getAdminStats = async (req, res) => {
@@ -93,7 +101,8 @@ exports.reassignDeal = async (req, res) => {
 
     deal.ownedBy = newCommercialId;
     await deal.save();
- 
+
+    logAudit(req.user.id, req.user.name, `Deal "${deal.title}" réattribué à ${newCommercial.name}.`, 'warning');
     res.json({ message: `Deal réattribué à ${newCommercial.name} avec succès.`, deal });
   } catch (err) {
     res.status(500).json({ error: "Erreur réattribution." });
@@ -210,9 +219,12 @@ exports.toggleUserStatus = async (req, res) => {
 
     user.isActive = !user.isActive;
     await user.save();
+
+    const action = user.isActive ? 'réactivé' : 'suspendu';
+    logAudit(req.user.id, req.user.name, `Compte de ${user.name} (${user.email}) ${action}.`, user.isActive ? 'info' : 'high');
     
     res.json({
-      message: `Le compte de ${user.name} a été ${user.isActive ? 'réactivé' : 'suspendu'} avec succès.`,
+      message: `Le compte de ${user.name} a été ${action} avec succès.`,
       user: {
         _id: user._id,
         name: user.name,
@@ -224,6 +236,43 @@ exports.toggleUserStatus = async (req, res) => {
   } catch (err) {
     console.error("Erreur suspension utilisateur :", err);
     res.status(500).json({ error: "Erreur lors du changement de statut." });
+  }
+};
+
+// === 9. JOURNAL D'AUDIT (GET /logs) ===
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const page  = parseInt(req.query.page)  || 1;
+    const limit = parseInt(req.query.limit) || 30;
+    const logs = await AuditLog.find({})
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+    const total = await AuditLog.countDocuments();
+    res.json({ logs, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    console.error("Erreur journal audit :", err);
+    res.status(500).json({ error: "Erreur récupération journal d'audit." });
+  }
+};
+
+// === 10. MISE À JOUR DE L'OBJECTIF MENSUEL (PUT /settings/goal) ===
+exports.updateGoal = async (req, res) => {
+  try {
+    const { monthlyGoal } = req.body;
+    const goal = Number(monthlyGoal);
+    if (!goal || goal <= 0) {
+      return res.status(400).json({ error: "Objectif invalide." });
+    }
+    // Stocker dans un modèle simple Settings ou directement en variable globale process
+    // Pour éviter une dépendance lourde, on stocke dans un document Settings upsert
+    const Settings = require('../models/Settings');
+    await Settings.findOneAndUpdate({}, { monthlyGoal: goal }, { upsert: true, new: true });
+    logAudit(req.user.id, req.user.name, `Objectif mensuel mis à jour : ${goal.toLocaleString('fr-FR')} FCFA.`, 'info');
+    res.json({ message: `Objectif mensuel fixé à ${goal.toLocaleString('fr-FR')} FCFA.`, monthlyGoal: goal });
+  } catch (err) {
+    console.error("Erreur mise à jour objectif :", err);
+    res.status(500).json({ error: "Erreur lors de la mise à jour de l'objectif." });
   }
 };
 

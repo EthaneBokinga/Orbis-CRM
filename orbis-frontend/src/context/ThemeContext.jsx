@@ -8,14 +8,23 @@ export const ThemeProvider = ({ children }) => {
 
   const applyTheme = (mode) => {
     const root = window.document.documentElement;
+    console.log('[Theme] Applying theme:', mode);
     if (mode === 'dark') {
       root.classList.add('dark');
+      console.log('[Theme] Added .dark to html classList:', root.classList.toString());
     } else if (mode === 'light') {
       root.classList.remove('dark');
+      console.log('[Theme] Removed .dark from html classList:', root.classList.toString());
     } else {
       // Mode 'system' — synchronisation avec l'OS
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      prefersDark ? root.classList.add('dark') : root.classList.remove('dark');
+      console.log('[Theme] System prefers dark:', prefersDark);
+      if (prefersDark) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      console.log('[Theme] System theme classList:', root.classList.toString());
     }
   };
 
@@ -34,10 +43,11 @@ export const ThemeProvider = ({ children }) => {
 
   // Cycle tri-state : dark → light → system → dark
   const cycleTheme = () => {
+    console.log('[Theme] Cycling theme from:', theme);
     setTheme(prev => {
-      if (prev === 'dark')   return 'light';
-      if (prev === 'light')  return 'system';
-      return 'dark';
+      const next = prev === 'dark' ? 'light' : prev === 'light' ? 'system' : 'dark';
+      console.log('[Theme] Next theme will be:', next);
+      return next;
     });
   };
 

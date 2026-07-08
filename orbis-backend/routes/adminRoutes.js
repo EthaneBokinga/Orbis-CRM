@@ -15,4 +15,9 @@ router.post('/users', adminController.createUser);
 router.put('/users/:id/toggle-status', adminController.toggleUserStatus);
 router.delete('/deals/:id', adminController.deleteDeal);
 
+// Nouvelles routes — Journal d'audit & Configuration
+router.get('/logs', adminController.getAuditLogs);
+router.put('/settings/goal', adminController.updateGoal);
+
 module.exports = router;
+
