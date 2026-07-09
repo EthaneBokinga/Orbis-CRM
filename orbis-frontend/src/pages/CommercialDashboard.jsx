@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/UI/Toast';
 import ThemeToggle from '../components/ThemeToggle';
 import ActivityTimeline from '../components/ActivityTimeline';
-import { X, User, Phone, Mail, Inbox, Clipboard, Clock, ChevronRight, ChevronLeft, RefreshCw, Confetti, Plus } from 'lucide-react';
+import { X, User, Phone, Mail, Inbox, Clipboard, Clock, ChevronRight, ChevronLeft, RefreshCw, Plus } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/crm` 
@@ -100,7 +100,7 @@ export default function CommercialDashboard({ onLogout }) {
   const [publicDeals, setPublicDeals] = useState([]);
 
   // Récupération du token d'authentification
-  const getAuthHeader = () => {
+  const getAuthHeader = (isJson = true) => {
     return {
       credentials: 'include',
       headers: isJson ? { 'Content-Type': 'application/json' } : undefined
@@ -112,9 +112,6 @@ export default function CommercialDashboard({ onLogout }) {
     setLoading(true);
     try {
       const [resContacts, resDeals, resStats] = await Promise.all([
-        fetch(`${API_URL}/contacts`, getAuthHeader()).then(r => r.json()),
-        fetch(`${API_URL}/deals`, getAuthHeader()).then(r => r.json()),
-        fetch(`${API_URL}/dashboard/stats`, getAuthHeader()).then(r => r.json())
         fetch(`${API_URL}/contacts`, getAuthHeader(false)).then(r => r.json()),
         fetch(`${API_URL}/deals`, getAuthHeader(false)).then(r => r.json()),
         fetch(`${API_URL}/dashboard/stats`, getAuthHeader(false)).then(r => r.json())
@@ -133,8 +130,7 @@ export default function CommercialDashboard({ onLogout }) {
 
   const fetchPublicDeals = async () => {
     try {
-      const res = await fetch(`${API_URL}/deals/public`, getAuthHeader());
-        const res = await fetch(`${API_URL}/deals/public`, getAuthHeader(false));
+      const res = await fetch(`${API_URL}/deals/public`, getAuthHeader(false));
       if (res.ok) {
         const data = await res.json();
         setPublicDeals(Array.isArray(data) ? data : []);
@@ -171,8 +167,7 @@ export default function CommercialDashboard({ onLogout }) {
   // === CHARGEMENT DES ÉCHANGES QUAND ON CLIQUE SUR UN CONTACT ===
   useEffect(() => {
     if (selectedContact) {
-      fetch(`${API_URL}/interactions/${selectedContact._id}`, getAuthHeader())
-          fetch(`${API_URL}/interactions/${selectedContact._id}`, getAuthHeader(false))
+      fetch(`${API_URL}/interactions/${selectedContact._id}`, getAuthHeader(false))
         .then(r => r.json())
         .then(data => setInteractions(Array.isArray(data) ? data : []))
         .catch(err => console.error("Erreur interactions :", err));
@@ -762,7 +757,7 @@ export default function CommercialDashboard({ onLogout }) {
 
                 {publicDeals.filter(d => d.title?.toLowerCase().includes(searchQuery.toLowerCase()) || d.company?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 rounded-2xl border border-dashed border-slate-800 text-center bg-slate-900/5 py-16">
-                <Confetti className="w-12 h-12 text-teal-400 mb-2" />
+                <Inbox className="w-12 h-12 text-teal-400 mb-2" />
                 <p className="text-sm font-semibold text-slate-400">Le marché est vide !</p>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">Tous les leads ont été assignés ou récupérés. L'administration injectera bientôt de nouvelles opportunités.</p>
               </div>
