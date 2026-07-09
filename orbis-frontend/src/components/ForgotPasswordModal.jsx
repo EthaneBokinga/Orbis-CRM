@@ -163,7 +163,7 @@ export default function ForgotPasswordModal({ onClose }) {
               </p>
               {devCode && (
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-400">
-                  <span className="font-bold">Mode dev (SMTP non configuré)</span> — Votre code est : <span className="font-mono text-lg tracking-widest text-amber-300">{devCode}</span>
+                  <span className="font-bold">Vérification rapide</span> — Si l’email n’arrive pas, veuillez réessayer dans quelques instants.
                 </div>
               )}
               <div>

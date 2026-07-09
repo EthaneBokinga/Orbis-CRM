@@ -233,15 +233,27 @@ exports.forgotPassword = async (req, res) => {
     user.resetCodeExpires = Date.now() + 15 * 60 * 1000; // Valide 15 min
     await user.save();
 
-    // Envoi de l'email via Nodemailer
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = Number(process.env.SMTP_PORT || 587);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM || smtpUser || 'bokingaethanenathan@gmail.com';
+
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      console.error('[SMTP] Configuration incomplète. Vérifiez SMTP_HOST, SMTP_USER et SMTP_PASS.');
+      return res.status(503).json({
+        error: 'Le service d’email n’est pas encore configuré. Veuillez contacter l’administrateur.'
+      });
+    }
+
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
       auth: {
-        user: process.env.SMTP_USER || 'bokingaethanenathan@gmail.com',
-        pass: process.env.SMTP_PASS || ''
+        user: smtpUser,
+        pass: smtpPass
       },
       connectionTimeout: 8000,
       greetingTimeout: 8000,
@@ -249,7 +261,7 @@ exports.forgotPassword = async (req, res) => {
     });
 
     const mailOptions = {
-      from: `"Orbis CRM Securité" <${process.env.SMTP_USER || 'bokingaethanenathan@gmail.com'}>`,
+      from: `"Orbis CRM Sécurité" <${smtpFrom}>`,
       to: cleanEmail,
       subject: "🔒 Code de réinitialisation de votre mot de passe Orbis CRM",
       html: `
@@ -283,12 +295,9 @@ exports.forgotPassword = async (req, res) => {
       console.log(`[SMTP] Code envoyé à ${cleanEmail}`);
       return res.json({ message: "Si cet email existe, un code de réinitialisation y a été envoyé." });
     } catch (mailErr) {
-      console.warn(`[SMTP] Échec d'envoi de mail à ${cleanEmail} :`, mailErr.message);
-      console.log(`[DEV MODE] CODE SECRET POUR ${cleanEmail} IS : ${code}`);
-
-      return res.json({
-        message: "Si cet email existe, un code de réinitialisation y a été envoyé.",
-        _devCode: code
+      console.error(`[SMTP] Échec d'envoi de mail à ${cleanEmail} :`, mailErr.message);
+      return res.status(502).json({
+        error: 'Impossible d’envoyer l’email pour le moment. Vérifiez la configuration SMTP.'
       });
     }
   } catch (err) {
