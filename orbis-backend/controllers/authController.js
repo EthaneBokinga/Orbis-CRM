@@ -2,8 +2,14 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
+const AuditLog = require('../models/AuditLog');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Helper audit
+const logAudit = (actorId, actorName, action, severity = 'info') => {
+  AuditLog.create({ actorId, actorName, actionDescription: action, severity }).catch(() => {});
+};
 
 const generateAccessToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
@@ -69,6 +75,8 @@ exports.login = async (req, res) => {
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
       maxAge: 15 * 60 * 1000
     });
+
+    logAudit(user._id, user.name, `Connexion réussie en tant que ${user.role}.`, 'info');
 
     res.json({
       user: { id: user._id, name: user.name, email: user.email, role: user.role }
@@ -138,6 +146,8 @@ exports.googleLogin = async (req, res) => {
       maxAge: 15 * 60 * 1000
     });
 
+    logAudit(user._id, user.name, `Connexion Google réussie en tant que ${user.role}.`, 'info');
+
     res.json({
       user: { id: user._id, name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl }
     });
@@ -197,6 +207,7 @@ exports.logout = async (req, res) => {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
     if (user) {
+      logAudit(user._id, user.name, 'Déconnexion de la session.', 'info');
       user.refreshTokenHash = null;
       await user.save();
     }

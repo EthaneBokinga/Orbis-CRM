@@ -142,7 +142,7 @@ exports.reassignDeal = async (req, res) => {
 // === 5. CRÉATION D'UN DEAL DEPUIS LA CONSOLE ADMIN (POST /deals) ===
 exports.createDeal = async (req, res) => {
   try {
-    const { title, company, amount, assignedTo } = req.body;
+    const { title, company, amount, assignedTo, contactFirstName, contactLastName, phone, email, address } = req.body;
     if (!title || !company || !amount || !assignedTo) {
       return res.status(400).json({ error: "Champs requis manquants." });
     }
@@ -151,7 +151,6 @@ exports.createDeal = async (req, res) => {
     let targetOwnerId = null;
 
     if (!isPublic) {
-      // Valider si le commercial de destination existe et est actif
       const targetUser = await User.findOne({ _id: assignedTo, isActive: true });
       if (!targetUser) {
         return res.status(404).json({ error: "Utilisateur assigné introuvable ou inactif." });
@@ -164,14 +163,23 @@ exports.createDeal = async (req, res) => {
     let contact = await Contact.findOne({ company });
     if (!contact) {
       contact = new Contact({
-        firstName: "Contact",
-        lastName: company,
-        phone: "+242 06 000 00 00",
-        email: "contact@" + company.toLowerCase().replace(/\s+/g, '') + ".com",
+        firstName: contactFirstName?.trim() || "Contact",
+        lastName: contactLastName?.trim() || company,
+        phone: phone?.trim() || "+242 06 000 00 00",
+        email: email?.trim().toLowerCase() || ("contact@" + company.toLowerCase().replace(/\s+/g, '') + ".com"),
         company: company,
-        assignedTo: targetOwnerId || req.user.id, // Si public, assigner à l'admin créateur
+        address: address?.trim() || '',
+        assignedTo: targetOwnerId || req.user.id,
         createdBy: req.user.id
       });
+      await contact.save();
+    } else {
+      // Mettre à jour les infos du contact si fournies
+      if (contactFirstName) contact.firstName = contactFirstName.trim();
+      if (contactLastName) contact.lastName = contactLastName.trim();
+      if (phone) contact.phone = phone.trim();
+      if (email) contact.email = email.trim().toLowerCase();
+      if (address) contact.address = address.trim();
       await contact.save();
     }
  
@@ -181,10 +189,12 @@ exports.createDeal = async (req, res) => {
       amount: Number(amount),
       stage: 'découverte',
       probability: 10,
-      ownedBy: targetOwnerId || undefined // undefined en mongoose n'enregistre pas la clé (donc deal public)
+      ownedBy: targetOwnerId || undefined
     });
  
     await deal.save();
+
+    logAudit(req.user.id, req.user.name, `Deal "${title}" créé pour ${company} (${amount.toLocaleString('fr-FR')} FCFA).`, 'info');
     res.status(201).json(deal);
   } catch (err) {
     console.error("Erreur création deal admin :", err);
@@ -280,12 +290,23 @@ exports.toggleUserStatus = async (req, res) => {
 exports.getAuditLogs = async (req, res) => {
   try {
     const page  = parseInt(req.query.page)  || 1;
-    const limit = parseInt(req.query.limit) || 30;
-    const logs = await AuditLog.find({})
+    const limit = parseInt(req.query.limit) || 50;
+    const filter = {};
+    
+    // Filtre par utilisateur (actorId)
+    if (req.query.actorId) {
+      filter.actorId = req.query.actorId;
+    }
+    // Filtre par sévérité
+    if (req.query.severity) {
+      filter.severity = req.query.severity;
+    }
+
+    const logs = await AuditLog.find(filter)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
-    const total = await AuditLog.countDocuments();
+    const total = await AuditLog.countDocuments(filter);
     res.json({ logs, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     console.error("Erreur journal audit :", err);

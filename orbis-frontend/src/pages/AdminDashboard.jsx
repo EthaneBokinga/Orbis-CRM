@@ -30,16 +30,18 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading]     = useState(false);
 
   // --- Formulaires de création ---
-  const [newDealData, setNewDealData] = useState({ title: '', company: '', amount: '', assignedTo: '' });
+  const [newDealData, setNewDealData] = useState({ title: '', company: '', amount: '', assignedTo: '', contactFirstName: '', contactLastName: '', phone: '', email: '', address: '' });
   const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'commercial' });
 
   // --- États Audit & Objectifs ---
   const [auditLogs, setAuditLogs]   = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [auditFilterActor, setAuditFilterActor] = useState('');
   const [goalValue, setGoalValue]   = useState('');
   const [goalPeriod, setGoalPeriod] = useState('monthly'); // weekly | monthly | yearly
   const [goalSaving, setGoalSaving] = useState(false);
   const [settings, setSettings]     = useState({ weeklyGoal: 0, monthlyGoal: 0, yearlyGoal: 0 });
+  const [showGoalPeriods, setShowGoalPeriods] = useState(false); // multi-period mode
 
   // --- Pagination & Filtres ---
   const [dealPage, setDealPage]     = useState(1);
@@ -100,10 +102,13 @@ export default function AdminDashboard() {
   }, []);
 
   // === CHARGEMENT DU JOURNAL D'AUDIT ===
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (actorId) => {
     setAuditLoading(true);
     try {
-      const res = await fetch(`${API_URL}/logs`, getAuthHeader());
+      // Utiliser le paramètre passé ou le state actuel
+      const effectiveActor = actorId !== undefined ? actorId : auditFilterActor;
+      const params = effectiveActor ? `?actorId=${effectiveActor}` : '';
+      const res = await fetch(`${API_URL}/logs${params}`, getAuthHeader());
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data.logs || []);
@@ -184,8 +189,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         showToast("Lead global créé avec succès !", "success");
-        setShowDealModal(false);
-        setNewDealData({ title: '', company: '', amount: '', assignedTo: '' });
+        setShowDealModal(false);              setNewDealData({ title: '', company: '', amount: '', assignedTo: '', contactFirstName: '', contactLastName: '', phone: '', email: '', address: '' });
         fetchAdminData(); // Recharger les données et les compteurs
       } else {
         showToast(data.error || "Erreur lors de la création du lead.", "error");
@@ -705,14 +709,16 @@ export default function AdminDashboard() {
 
       {/* ================= MODAL 1 : INJECTER UN DEAL ================= */}
       {showDealModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleCreateDeal} className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleCreateDeal} className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 my-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white">Injecter un Nouveau Marché</h3>
               <button type="button" onClick={() => setShowDealModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {/* Infos du Deal */}
+              <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mt-1">Informations du Marché</p>
               <div className="space-y-1">
                 <label className="block text-[10px] font-semibold text-slate-400 uppercase">Titre du Projet *</label>
                 <input 
@@ -736,6 +742,63 @@ export default function AdminDashboard() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase">Prénom du Contact</label>
+                  <input 
+                    type="text" 
+                    placeholder="ex: Jean"
+                    value={newDealData.contactFirstName} 
+                    onChange={e => setNewDealData({...newDealData, contactFirstName: e.target.value})} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase">Nom du Contact</label>
+                  <input 
+                    type="text" 
+                    placeholder="ex: Dupont"
+                    value={newDealData.contactLastName} 
+                    onChange={e => setNewDealData({...newDealData, contactLastName: e.target.value})} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase">Téléphone</label>
+                  <input 
+                    type="tel" 
+                    placeholder="ex: +242 06 123 45 67"
+                    value={newDealData.phone} 
+                    onChange={e => setNewDealData({...newDealData, phone: e.target.value})} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase">Email</label>
+                  <input 
+                    type="email" 
+                    placeholder="ex: contact@entreprise.com"
+                    value={newDealData.email} 
+                    onChange={e => setNewDealData({...newDealData, email: e.target.value})} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase">Adresse</label>
+                <input 
+                  type="text" 
+                  placeholder="ex: 15 Avenue de la Libération, Brazzaville"
+                  value={newDealData.address} 
+                  onChange={e => setNewDealData({...newDealData, address: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
               
               <div className="space-y-1">
                 <label className="block text-[10px] font-semibold text-slate-400 uppercase">Budget Estimé (FCFA) *</label>
@@ -750,7 +813,7 @@ export default function AdminDashboard() {
               </div>
               
               <div className="space-y-1">
-                <label className="block text-[10px] font-semibold text-slate-400 uppercase">Attribuer Directly À *</label>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase">Attribuer à *</label>
                 <select 
                   required 
                   value={newDealData.assignedTo} 
@@ -911,20 +974,48 @@ export default function AdminDashboard() {
       {/* ================= SECTION CONFIGURATION & AUDIT ================= */}
       <section className="max-w-7xl mx-auto px-6 pb-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-        {/* — Objectif Mensuel — */}
+        {/* — Objectifs de Revenue (Multi-période) — */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-5">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-            Objectif Mensuel de Revenue
+            Objectifs de Revenue
           </h3>
-          <p className="text-xs text-slate-400">Définissez le cap de chiffre d'affaires que l'équipe doit atteindre ce mois-ci. L'objectif s'affiche dans le dashboard des commerciaux.</p>
+          <p className="text-xs text-slate-400">Définissez les caps de chiffre d'affaires par période. Les objectifs s'affichent dans le dashboard des commerciaux.</p>
+          
+          {/* Sélecteur de période */}
+          <div className="flex rounded-xl border border-slate-800 overflow-hidden">
+            {[
+              { value: 'monthly', label: 'Mensuel', current: settings.monthlyGoal },
+              { value: 'yearly', label: 'Annuel', current: settings.yearlyGoal },
+              { value: 'weekly', label: 'Hebdo', current: settings.weeklyGoal }
+            ].map(p => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => { setGoalPeriod(p.value); setGoalValue(p.current ? String(p.current) : ''); }}
+                className={`flex-1 py-2 text-xs font-bold transition-all ${
+                  goalPeriod === p.value
+                    ? 'bg-amber-500/20 text-amber-400 border-b-2 border-amber-400'
+                    : 'bg-slate-950 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {p.label}
+                {p.current > 0 && (
+                  <span className="block text-[9px] font-mono text-slate-500 mt-0.5">
+                    {p.current.toLocaleString('fr-FR')} F
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
           <form onSubmit={handleUpdateGoal} className="flex gap-3">
             <input
               type="number"
               min="1"
               value={goalValue}
               onChange={e => setGoalValue(e.target.value)}
-              placeholder="ex : 5 000 000"
+              placeholder={`ex : ${goalPeriod === 'yearly' ? '60 000 000' : goalPeriod === 'weekly' ? '1 000 000' : '5 000 000'}`}
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all"
             />
             <button
@@ -939,7 +1030,7 @@ export default function AdminDashboard() {
 
         {/* — Journal d’Audit — */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
               Journal d'Audit
@@ -947,6 +1038,26 @@ export default function AdminDashboard() {
             <button onClick={fetchAuditLogs} className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg border border-slate-800 hover:border-slate-700 flex items-center gap-2">
               <RefreshCw className="w-4 h-4" />
               Actualiser
+            </button>
+          </div>
+
+          {/* Filtre par utilisateur */}
+          <div className="flex gap-2">
+            <select
+              value={auditFilterActor}
+              onChange={e => { setAuditFilterActor(e.target.value); fetchAuditLogs(e.target.value); }}
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-rose-500/40"
+            >
+              <option value="">Tous les utilisateurs</option>
+              {commercials.map(c => (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => { setAuditFilterActor(''); fetchAuditLogs(''); }}
+              className="text-[10px] text-slate-500 hover:text-slate-300 px-2 py-1 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors"
+            >
+              Réinitialiser
             </button>
           </div>
 
