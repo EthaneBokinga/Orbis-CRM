@@ -62,14 +62,11 @@ export default function AdminDashboard() {
   const [profileAvatar, setProfileAvatar] = useState(currentUser.avatarUrl || '');
   const [profileSaving, setProfileSaving] = useState(false);
 
-  // --- Configuration Header de Sécurité (JWT) ---
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
+  // --- Configuration d'authentification : envoyer les cookies httpOnly au serveur ---
+  const getAuthHeader = (isJson = true) => {
     return {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      credentials: 'include',
+      headers: isJson ? { 'Content-Type': 'application/json' } : undefined
     };
   };
 
