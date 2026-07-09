@@ -1,43 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Smartphone, X, Share } from 'lucide-react';
+import { Download, Smartphone, X } from 'lucide-react';
 
-// Détection iOS robuste (iPhone, iPad, iPod et iPad OS 13+)
-const isIOSDevice = () => {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  );
-};
+const isIOSDevice = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const isAndroidDevice = () => /Android/.test(navigator.userAgent);
 
 const isInStandaloneMode = () =>
-  window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  window.matchMedia('(display-mode: standalone)').matches ||
+  window.navigator.standalone;
 
 export default function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showAndroid, setShowAndroid] = useState(false);
-  const [showIOS, setShowIOS] = useState(false);
+  const [platform, setPlatform] = useState(null);
+  const [showDetails, setShowDetails] = useState(false);
   const [showFallbackInstructions, setShowFallbackInstructions] = useState(false);
 
   useEffect(() => {
-    // Si l'application est déjà installée et ouverte en mode PWA standalone → ne rien afficher
     if (isInStandaloneMode()) return;
 
-    // Déterminer la plateforme et afficher la bannière correspondante sur chaque rafraîchissement
     if (isIOSDevice()) {
-      setShowIOS(true);
-    } else {
-      setShowAndroid(true);
+      setPlatform('ios');
+      return;
     }
 
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowAndroid(true);
+    if (isAndroidDevice()) {
+      setPlatform('android');
+      return;
+    }
+
+    setPlatform('desktop');
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
+      setPlatform('android');
     };
 
     const handleAppInstalled = () => {
-      setShowAndroid(false);
-      setShowIOS(false);
+      setPlatform(null);
       setDeferredPrompt(null);
     };
 
@@ -52,125 +56,121 @@ export default function PWAInstallBanner() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
-      // Si l'événement beforeinstallprompt n'a pas encore été déclenché par le navigateur, 
-      // on affiche les instructions manuelles pour les navigateurs de bureau/Android.
       setShowFallbackInstructions(true);
       return;
     }
+
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
+
     if (outcome === 'accepted') {
-      setShowAndroid(false);
+      setPlatform(null);
       setDeferredPrompt(null);
     }
   };
 
-  // Bannière iOS
-  if (showIOS) {
-    return (
-      <div className="fixed bottom-6 right-4 left-4 md:left-auto md:right-6 md:w-96 z-50 animate-slideUp">
-        <div className="bg-slate-900/97 backdrop-blur-xl border border-teal-500/30 text-white rounded-2xl shadow-2xl p-5 relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 w-24 h-24 bg-teal-500/10 rounded-full blur-2xl" />
-          <button
-            onClick={() => setShowIOS(false)}
-            className="absolute top-3 right-3 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/50 transition-colors"
-            aria-label="Fermer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+  if (!platform) return null;
 
-          <div className="flex gap-3 mb-3">
-            <div className="flex-shrink-0 w-11 h-11 bg-teal-500/10 border border-teal-500/20 rounded-xl flex items-center justify-center text-teal-400">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div className="flex-1 pr-5">
-              <h3 className="font-bold text-sm text-white">Installer Orbis CRM</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Accès rapide depuis votre écran d'accueil</p>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/60 rounded-xl p-3 space-y-2 border border-slate-700/40">
-            <p className="text-[10px] font-semibold text-teal-400 uppercase tracking-wider mb-2">Instructions d'installation :</p>
-            
-            <div className="flex items-start gap-2.5">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-bold flex items-center justify-center mt-0.5">1</span>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Appuyez sur l'icône de <strong className="text-white">Partage</strong> (icône <strong className="text-white">⬆</strong> ou menu de votre navigateur)
-              </p>
-            </div>
-            
-            <div className="flex items-start gap-2.5">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-bold flex items-center justify-center mt-0.5">2</span>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Faites défiler le menu et appuyez sur <strong className="text-white">"Sur l'écran d'accueil"</strong> ou <strong className="text-white">"Ajouter à l'écran d'accueil"</strong>
-              </p>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-bold flex items-center justify-center mt-0.5">3</span>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Appuyez sur <strong className="text-white">"Ajouter"</strong> en haut à droite pour finaliser
-              </p>
-            </div>
-          </div>
-
-          <p className="text-[10px] text-slate-500 text-center mt-3">
-            Ce message disparaîtra définitivement une fois l'application installée.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Bannière Android / Chrome / Desktop
-  if (!showAndroid) return null;
+  const containerClasses =
+    'fixed inset-x-4 bottom-4 z-50 max-w-[min(420px,calc(100%-2rem))] mx-auto';
+  const buttonClasses =
+    'w-full rounded-3xl px-4 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-sm font-semibold text-slate-950 shadow-lg shadow-teal-500/20 hover:opacity-95 transition';
+  const cardClasses =
+    'mt-3 bg-slate-950 border border-slate-800 text-white rounded-[28px] shadow-2xl p-4 sm:p-5 overflow-hidden';
+  const sectionTitleClasses = 'text-[10px] font-semibold text-teal-400 uppercase tracking-wider';
+  const descriptionClasses = 'text-xs text-slate-400 leading-relaxed';
+  const listTextClasses = 'text-xs text-slate-300 leading-relaxed';
 
   return (
-    <div className="fixed bottom-6 right-4 left-4 md:left-auto md:right-6 md:w-96 z-50 animate-slideUp">
-      <div className="bg-slate-900/97 backdrop-blur-xl border border-teal-500/30 text-white rounded-2xl shadow-2xl p-5 relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-24 h-24 bg-teal-500/10 rounded-full blur-2xl" />
-        <button
-          onClick={() => setShowAndroid(false)}
-          className="absolute top-3 right-3 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/50 transition-colors"
-          aria-label="Fermer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="flex gap-4">
-          <div className="flex-shrink-0 w-12 h-12 bg-teal-500/10 border border-teal-500/20 rounded-xl flex items-center justify-center text-teal-400">
-            <Smartphone className="w-6 h-6 animate-pulse" />
+    <div className={containerClasses}>
+      <div className="bg-slate-950 border border-slate-800 rounded-[28px] shadow-2xl p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-3xl bg-teal-500/10 border border-teal-500/25 flex items-center justify-center text-teal-400">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-[0.24em] mb-1">Orbis CRM</p>
+              <h3 className="text-sm font-semibold text-white">Installer l’application</h3>
+            </div>
           </div>
-          <div className="flex-1 pr-6">
-            <h3 className="font-semibold text-sm text-slate-100">Orbis CRM sur Mobile</h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Installez l'application pour un accès instantané et une expérience fluide plein écran.
-            </p>
-          </div>
+          <button
+            type="button"
+            className={buttonClasses}
+            onClick={() => setShowDetails((current) => !current)}
+          >
+            {showDetails ? 'Cacher les détails' : 'Voir l’installation'}
+          </button>
         </div>
 
-        {showFallbackInstructions && (
-          <div className="mt-3 bg-slate-800/60 border border-slate-700/40 rounded-xl p-3 text-xs text-slate-300 leading-relaxed animate-fadeIn">
-            <p className="font-semibold text-teal-400 mb-1">Méthode manuelle :</p>
-            Cliquez sur le menu de votre navigateur (les <strong className="text-white">3 points</strong> en haut à droite ou l'icône de <strong className="text-white">téléchargement</strong> dans la barre d'adresse) puis sélectionnez <strong className="text-white">"Installer l'application"</strong> ou <strong className="text-white">"Ajouter à l'écran d'accueil"</strong>.
+        {showDetails && (
+          <div className={cardClasses}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-3xl bg-teal-500/10 border border-teal-500/25 flex items-center justify-center text-teal-400">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white">Installer Orbis CRM</h4>
+                  <p className={descriptionClasses}>Ajoutez l’application pour un accès rapide et une meilleure expérience mobile.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlatform(null)}
+                className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800/60 transition-colors"
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 bg-slate-900 border border-slate-800 rounded-3xl p-4">
+              <p className={sectionTitleClasses}>Instructions</p>
+              <div className="flex gap-3">
+                <span className="w-6 h-6 rounded-full bg-teal-500/15 text-teal-300 text-[10px] font-bold flex items-center justify-center">1</span>
+                <p className={listTextClasses}>
+                  Appuyez sur l’icône de partage dans Safari ou sur le bouton d’installation dans Chrome.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-6 h-6 rounded-full bg-teal-500/15 text-teal-300 text-[10px] font-bold flex items-center justify-center">2</span>
+                <p className={listTextClasses}>Sélectionnez « Ajouter à l’écran d’accueil » ou « Installer ».</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-6 h-6 rounded-full bg-teal-500/15 text-teal-300 text-[10px] font-bold flex items-center justify-center">3</span>
+                <p className={listTextClasses}>Confirmez l’ajout puis lancez Orbis CRM en plein écran.</p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-between">
+              <button
+                type="button"
+                onClick={() => setShowFallbackInstructions(true)}
+                className="w-full sm:w-auto px-4 py-3 rounded-3xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"
+              >
+                Voir méthode manuelle
+              </button>
+              <button
+                type="button"
+                onClick={handleInstallClick}
+                className="w-full sm:w-auto px-4 py-3 rounded-3xl bg-gradient-to-r from-teal-500 to-emerald-500 text-xs font-bold text-slate-950 shadow-lg shadow-teal-500/20 hover:opacity-95 transition"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Installer
+              </button>
+            </div>
+
+            {showFallbackInstructions && (
+              <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-900 p-4 text-xs text-slate-300">
+                <p className={sectionTitleClasses}>Méthode manuelle</p>
+                <p className={listTextClasses}>
+                  Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ». Cette bannière est maintenant cachée sauf si vous réouvrez les détails.
+                </p>
+              </div>
+            )}
           </div>
         )}
-
-        <div className="flex gap-2.5 mt-4 justify-end">
-          <button
-            onClick={() => setShowAndroid(false)}
-            className="px-3.5 py-1.5 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-          >
-            Plus tard
-          </button>
-          <button
-            onClick={handleInstallClick}
-            className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:opacity-90 text-xs font-bold text-slate-950 flex items-center gap-1.5 shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Installer
-          </button>
-        </div>
       </div>
     </div>
   );
