@@ -238,11 +238,14 @@ exports.forgotPassword = async (req, res) => {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: process.env.SMTP_PORT || 587,
-      secure: false, // true for 465, false for other ports
+      secure: false,
       auth: {
         user: process.env.SMTP_USER || 'bokingaethanenathan@gmail.com',
-        pass: process.env.SMTP_PASS || '' // À configurer sur Render
-      }
+        pass: process.env.SMTP_PASS || ''
+      },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 8000
     });
 
     const mailOptions = {
@@ -278,19 +281,16 @@ exports.forgotPassword = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
       console.log(`[SMTP] Code envoyé à ${cleanEmail}`);
+      return res.json({ message: "Si cet email existe, un code de réinitialisation y a été envoyé." });
     } catch (mailErr) {
       console.warn(`[SMTP] Échec d'envoi de mail à ${cleanEmail} :`, mailErr.message);
       console.log(`[DEV MODE] CODE SECRET POUR ${cleanEmail} IS : ${code}`);
-      // En mode dev, on permet de récupérer le code s'il n'y a pas d'SMTP configuré pour ne pas bloquer l'utilisateur
-      if (!process.env.SMTP_PASS) {
-        return res.json({ 
-          message: "Si cet email existe, un code de réinitialisation y a été envoyé.",
-          _devCode: code // Fourni uniquement si SMTP_PASS n'est pas configuré pour faciliter les tests
-        });
-      }
-    }
 
-    res.json({ message: "Si cet email existe, un code de réinitialisation y a été envoyé." });
+      return res.json({
+        message: "Si cet email existe, un code de réinitialisation y a été envoyé.",
+        _devCode: code
+      });
+    }
   } catch (err) {
     console.error("Erreur forgotPassword :", err);
     res.status(500).json({ error: "Erreur interne lors du traitement." });

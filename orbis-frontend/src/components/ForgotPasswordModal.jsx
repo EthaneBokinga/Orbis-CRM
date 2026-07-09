@@ -17,19 +17,32 @@ export default function ForgotPasswordModal({ onClose }) {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setDevCode('');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const res = await fetch(`${API}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email }),
+        signal: controller.signal
       });
-      const data = await res.json();
+
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Erreur d'envoi.");
-      if (data._devCode) setDevCode(data._devCode); // Mode dev sans SMTP
+
+      if (data._devCode) setDevCode(data._devCode);
       setStep(2);
     } catch (err) {
-      setError(err.message);
+      if (err.name === 'AbortError') {
+        setError('Le serveur met trop de temps à répondre. Veuillez réessayer.');
+      } else {
+        setError(err.message || 'Impossible d’envoyer le code pour le moment.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
