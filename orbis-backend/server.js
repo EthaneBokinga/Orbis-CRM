@@ -46,8 +46,9 @@ async function seedAdminIfMissing() {
     // Supprimer l'ancien admin de test s'il existe
     await User.deleteOne({ email: 'admin@orbis-crm.com' });
 
-    const adminExists = await User.findOne({ email: 'ethanebokinga00@gmail.com' });
-    if (!adminExists) {
+    // Admin 1 : Ethan Bokinga
+    const admin1Exists = await User.findOne({ email: 'ethanebokinga00@gmail.com' });
+    if (!admin1Exists) {
       const adminUser = new User({
         name: 'Ethan Bokinga (Admin)',
         email: 'ethanebokinga00@gmail.com',
@@ -60,6 +61,23 @@ async function seedAdminIfMissing() {
       console.log('=== ORBIS SEEDER === ✓ Compte Admin créé : ethanebokinga00@gmail.com / NTHBG1234@');
     } else {
       console.log('=== ORBIS SEEDER === ✓ Admin existant détecté (ethanebokinga00@gmail.com).');
+    }
+
+    // Admin 2 : Soise Gallouo
+    const admin2Exists = await User.findOne({ email: 'soisegallouo@gmail.com' });
+    if (!admin2Exists) {
+      const adminUser2 = new User({
+        name: 'Soise Gallouo (Admin)',
+        email: 'soisegallouo@gmail.com',
+        passwordHash: 'NTHBG1234@',
+        authProvider: 'local',
+        role: 'admin',
+        isActive: true
+      });
+      await adminUser2.save();
+      console.log('=== ORBIS SEEDER === ✓ Compte Admin créé : soisegallouo@gmail.com / NTHBG1234@');
+    } else {
+      console.log('=== ORBIS SEEDER === ✓ Admin existant détecté (soisegallouo@gmail.com).');
     }
   } catch (err) {
     console.error('=== ORBIS SEEDER === ✗ Erreur lors du seeding admin :', err.message);

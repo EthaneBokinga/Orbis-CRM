@@ -343,13 +343,11 @@ export default function AuthPage({ onLoginSuccess }) {
         </div>
 
         {/* GOOGLE OAUTH */}
-        <div className="flex justify-center w-full rounded-xl overflow-hidden border border-slate-800/80">
-          <GoogleLogin
+        <div className="flex justify-center w-full rounded-xl overflow-hidden border border-slate-800/80">            <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => showToast('Connexion via Google avortée.', 'error')}
             useOneTap
             theme="filled_black"
-            width="100%"
           />
         </div>
 

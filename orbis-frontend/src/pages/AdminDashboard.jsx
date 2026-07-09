@@ -922,8 +922,8 @@ export default function AdminDashboard() {
             <input
               type="number"
               min="1"
-              value={monthlyGoal}
-              onChange={e => setMonthlyGoal(e.target.value)}
+              value={goalValue}
+              onChange={e => setGoalValue(e.target.value)}
               placeholder="ex : 5 000 000"
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all"
             />
