@@ -32,11 +32,20 @@ export default function AdminDashboard() {
   const [newDealData, setNewDealData] = useState({ title: '', company: '', amount: '', assignedTo: '' });
   const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: 'commercial' });
 
-  // --- États Audit & Objectif Mensuel ---
+  // --- États Audit & Objectifs ---
   const [auditLogs, setAuditLogs]   = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [monthlyGoal, setMonthlyGoal]   = useState('');
-  const [goalSaving, setGoalSaving]     = useState(false);
+  const [goalValue, setGoalValue]   = useState('');
+  const [goalPeriod, setGoalPeriod] = useState('monthly'); // weekly | monthly | yearly
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [settings, setSettings]     = useState({ weeklyGoal: 0, monthlyGoal: 0, yearlyGoal: 0 });
+
+  // --- Pagination & Filtres ---
+  const [dealPage, setDealPage]     = useState(1);
+  const DEALS_PER_PAGE              = 8;
+  const [teamSearch, setTeamSearch] = useState('');
+  const [teamRoleFilter, setTeamRoleFilter] = useState('all');
+  const [dealSearch, setDealSearch] = useState('');
 
   // --- États de Profil Utilisateur ---
   const [currentUser, setCurrentUser] = useState(() => {
@@ -89,6 +98,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchAdminData();
     fetchAuditLogs();
+    fetchSettings();
   }, []);
 
   // === CHARGEMENT DU JOURNAL D'AUDIT ===
@@ -104,28 +114,59 @@ export default function AdminDashboard() {
     finally { setAuditLoading(false); }
   };
 
-  // === ACTION : MISE À JOUR DE L'OBJECTIF ===
+  // === CHARGEMENT DES PARAMÈTRES (objectifs) ===
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings`, getAuthHeader());
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+      }
+    } catch {}
+  };
+
+  // === ACTION : MISE À JOUR DE L'OBJECTIF (multi-période) ===
   const handleUpdateGoal = async (e) => {
     e.preventDefault();
-    const val = Number(monthlyGoal);
+    const val = Number(goalValue);
     if (!val || val <= 0) return showToast("Entrez un objectif valide.", "warning");
     setGoalSaving(true);
     try {
       const res = await fetch(`${API_URL}/settings/goal`, {
         method: 'PUT',
         ...getAuthHeader(),
-        body: JSON.stringify({ monthlyGoal: val })
+        body: JSON.stringify({ goal: val, period: goalPeriod })
       });
       const data = await res.json();
       if (res.ok) {
         showToast(data.message, "success");
-        setMonthlyGoal('');
+        setGoalValue('');
+        fetchSettings();
         fetchAuditLogs();
       } else {
         showToast(data.error || "Erreur.", "error");
       }
     } catch { showToast("Erreur réseau.", "error"); }
     finally { setGoalSaving(false); }
+  };
+
+  // === ACTION : CHANGER LE RÔLE D'UN MEMBRE ===
+  const handleChangeRole = async (userId, newRole) => {
+    try {
+      const res = await fetch(`${API_URL}/users/${userId}/role`, {
+        method: 'PUT',
+        ...getAuthHeader(),
+        body: JSON.stringify({ role: newRole })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message, "success");
+        fetchAdminData();
+        fetchAuditLogs();
+      } else {
+        showToast(data.error || "Erreur.", "error");
+      }
+    } catch { showToast("Erreur réseau.", "error"); }
   };
 
   // === ACTION : CRÉER UN LEAD (POST) ===
@@ -395,81 +436,141 @@ export default function AdminDashboard() {
 
         {/* GRILLE ANALYTIQUE CONSOLIDÉE */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 p-6 relative overflow-hidden">
-            <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Chiffre d'Affaires Global (Pipeline)</p>
-            <p className="text-3xl font-extrabold text-white mt-2 font-mono tracking-tight">{stats.totalPipeline?.toLocaleString('fr-FR')} <span className="text-sm font-sans text-emerald-400">FCFA</span></p>
-            <p className="text-[11px] text-slate-500 mt-3">Cumul de l'intégralité des portefeuilles de l'équipe</p>
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 relative overflow-hidden shadow-sm dark:shadow-none">
+            <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase">Chiffre d'Affaires Global (Pipeline)</p>
+            <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 font-mono tracking-tight">{stats.totalPipeline?.toLocaleString('fr-FR')} <span className="text-sm font-sans text-teal-600 dark:text-emerald-400">FCFA</span></p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">Cumul de l'intégralité des portefeuilles de l'équipe</p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 p-6">
-            <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Opportunités Actives</p>
-            <p className="text-3xl font-extrabold text-white mt-2 font-mono tracking-tight">{stats.activeDealsCount} <span className="text-sm font-sans text-slate-400">Négociations</span></p>
-            <p className="text-[11px] text-slate-500 mt-3">Dossiers en cours de traitement sur le terrain</p>
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-none">
+            <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase">Opportunités Actives</p>
+            <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 font-mono tracking-tight">{stats.activeDealsCount} <span className="text-sm font-sans text-slate-500 dark:text-slate-400">Négociations</span></p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">Dossiers en cours de traitement sur le terrain</p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 p-6">
-            <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Taux de Conversion (Win Rate)</p>
-            <p className="text-3xl font-extrabold text-emerald-400 mt-2 font-mono tracking-tight">{stats.winRate} <span className="text-sm font-sans text-slate-400">%</span></p>
-            <p className="text-[11px] text-slate-500 mt-3">Moyenne de signature d'affaires globale</p>
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-none">
+            <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase">Taux de Conversion (Win Rate)</p>
+            <p className="text-3xl font-extrabold text-teal-600 dark:text-emerald-400 mt-2 font-mono tracking-tight">{stats.winRate} <span className="text-sm font-sans text-slate-500 dark:text-slate-400">%</span></p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">Moyenne de signature d'affaires globale</p>
           </div>
         </div>
 
         {/* SECTION DOUBLE COMPOSANT : SUIVI DES COMMERCIAUX & TABLEAU DE STRATÉGIE */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* 1. PERFORMANCES DE L'ÉQUIPE (LISTE DES COMMERCIAUX AVEC SUSPENSION) */}
+          {/* 1. PERFORMANCES DE L'ÉQUIPE */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-4">
             <h3 className="text-base font-bold text-white flex items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2"></span> Activité de l'équipe
             </h3>
-            <div className="space-y-3">
-              {commercials.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">Aucun commercial inscrit.</p>
-              ) : (
-                commercials.map(c => (
-                  <div key={c._id} className="p-3 bg-slate-950 border border-slate-800/60 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="relative">
-                        {c.avatarUrl ? (
-                          <img src={c.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-slate-800" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
-                            {c.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${c.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+
+            {/* Filtres équipe */}
+            <div className="flex gap-2">
+              <input
+                value={teamSearch}
+                onChange={e => setTeamSearch(e.target.value)}
+                placeholder="Rechercher un membre..."
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-teal-500/40"
+              />
+              <select
+                value={teamRoleFilter}
+                onChange={e => setTeamRoleFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-400 focus:outline-none"
+              >
+                <option value="all">Tous rôles</option>
+                <option value="commercial">Commercial</option>
+                <option value="marketing">Marketing</option>
+                <option value="rh">RH</option>
+                <option value="tech">Tech</option>
+                <option value="direction">Direction</option>
+              </select>
+            </div>
+
+            <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+              {commercials
+                .filter(c => {
+                  const matchSearch = c.name.toLowerCase().includes(teamSearch.toLowerCase()) || c.email.toLowerCase().includes(teamSearch.toLowerCase());
+                  const matchRole = teamRoleFilter === 'all' || c.role === teamRoleFilter;
+                  return matchSearch && matchRole;
+                })
+                .map(c => (
+                  <div key={c._id} className="p-3 bg-slate-950 border border-slate-800/60 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative">
+                          {c.avatarUrl ? (
+                            <img src={c.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-slate-800" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                              {c.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${c.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-semibold text-slate-200 leading-none">{c.name}</p>
+                          <p className="text-[9px] text-slate-500 font-mono mt-0.5 max-w-[110px] truncate">{c.email}</p>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <p className="text-sm font-semibold text-slate-200 leading-none">{c.name}</p>
-                        <p className="text-[9px] text-slate-500 font-mono mt-1 max-w-[120px] truncate">{c.email}</p>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-right">
+                          <span className="text-xs font-bold font-mono text-emerald-400">{c.dealCount || 0}</span>
+                          <p className="text-[9px] text-slate-500 uppercase tracking-tight">Deals</p>
+                        </div>
+                        <button
+                          onClick={() => handleToggleUserStatus(c)}
+                          title={c.isActive ? "Suspendre" : "Réactiver"}
+                          className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] transition-all border ${
+                            c.isActive
+                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20'
+                              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
+                          }`}
+                        >
+                          {c.isActive ? '🚫' : '🔑'}
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="text-right">
-                        <span className="text-xs font-bold font-mono text-emerald-400">{c.dealCount || 0}</span>
-                        <p className="text-[9px] text-slate-500 uppercase tracking-tight">Deals</p>
-                      </div>
-                      <button 
-                        onClick={() => handleToggleUserStatus(c)}
-                        title={c.isActive ? "Suspendre l'accès" : "Réactiver l'accès"}
-                        className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] transition-all duration-200 border ${
-                          c.isActive 
-                            ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20' 
-                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
-                        }`}
+
+                    {/* Changement de rôle */}
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <span className="text-[9px] text-slate-600 uppercase tracking-wider">Rôle :</span>
+                      <select
+                        value={c.role || 'commercial'}
+                        onChange={e => handleChangeRole(c._id, e.target.value)}
+                        className="flex-1 bg-slate-900 border border-slate-800 rounded-md px-2 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-teal-500/40 cursor-pointer"
                       >
-                        {c.isActive ? '🚫' : '🔑'}
-                      </button>
+                        <option value="commercial">Commercial / Vente</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="rh">Ressources Humaines (RH)</option>
+                        <option value="autre">Autre service</option>
+                        <option value="admin">Administrateur</option>
+                      </select>
                     </div>
                   </div>
                 ))
+              }
+              {commercials.filter(c => {
+                const matchSearch = c.name.toLowerCase().includes(teamSearch.toLowerCase()) || c.email.toLowerCase().includes(teamSearch.toLowerCase());
+                const matchRole = teamRoleFilter === 'all' || c.role === teamRoleFilter;
+                return matchSearch && matchRole;
+              }).length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-4">Aucun membre trouvé.</p>
               )}
             </div>
           </div>
 
+
           {/* 2. TABLEAU DE RÉATTRIBUTION ET SURVEILLANCE GLOBALE */}
           <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-4">
-            <h3 className="text-base font-bold text-white">Flux et Attribution des Leads Entreprise</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-base font-bold text-white">Flux et Attribution des Leads Entreprise</h3>
+              <input
+                value={dealSearch}
+                onChange={e => { setDealSearch(e.target.value); setDealPage(1); }}
+                placeholder="Rechercher un lead..."
+                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-teal-500/40 w-48"
+              />
+            </div>
             
             <div className="overflow-x-auto rounded-xl border border-slate-800/80">
               <table className="w-full text-left border-collapse text-xs">
@@ -482,12 +583,10 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
-                  {allDeals.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="p-8 text-center text-slate-500 font-mono">Aucun lead actif sur le marché.</td>
-                    </tr>
-                  ) : (
-                    allDeals.map(d => (
+                  {allDeals
+                    .filter(d => d.title?.toLowerCase().includes(dealSearch.toLowerCase()) || d.company?.toLowerCase().includes(dealSearch.toLowerCase()))
+                    .slice((dealPage - 1) * DEALS_PER_PAGE, dealPage * DEALS_PER_PAGE)
+                    .map(d => (
                       <tr key={d._id} className="hover:bg-slate-900/40 transition-colors">
                         <td className="p-3.5">
                           <p className="font-bold text-white">{d.title}</p>
@@ -495,31 +594,64 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-3.5 font-mono text-slate-300 font-medium">{d.amount?.toLocaleString('fr-FR')} F</td>
                         <td className="p-3.5">
-                          <span className="inline-flex items-center text-slate-400 bg-slate-950 px-2.5 py-1 border border-slate-800 rounded-md">
-                            👤 {d.assignedTo?.name || "Non assigné"}
+                          <span className={`inline-flex items-center px-2.5 py-1 border rounded-md text-xs ${
+                            d.assignedTo ? 'text-slate-400 bg-slate-950 border-slate-800' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                          }`}>
+                            {d.assignedTo ? `👤 ${d.assignedTo?.name}` : '🔓 Public (non assigné)'}
                           </span>
                         </td>
-                        <td className="p-3.5 text-right flex items-center justify-end space-x-2">
-                          <button 
-                            onClick={() => setSelectedDeal(d)}
-                            className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-teal-400 hover:text-white hover:border-teal-500/20 hover:bg-teal-500/5 text-[11px] font-bold rounded-lg transition-all"
-                          >
-                            Transférer
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteDeal(d._id)}
-                            className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-[11px] font-bold rounded-lg transition-all"
-                          >
-                            Retirer
-                          </button>
+                        <td className="p-3.5 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => setSelectedDeal(d)}
+                              className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-teal-400 hover:text-white hover:border-teal-500/20 hover:bg-teal-500/5 text-[11px] font-bold rounded-lg transition-all"
+                            >
+                              Transférer
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDeal(d._id)}
+                              className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-[11px] font-bold rounded-lg transition-all"
+                            >
+                              Retirer
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
+                  }
+                  {allDeals.filter(d => d.title?.toLowerCase().includes(dealSearch.toLowerCase()) || d.company?.toLowerCase().includes(dealSearch.toLowerCase())).length === 0 && (
+                    <tr><td colSpan="4" className="p-8 text-center text-slate-500 font-mono">Aucun lead actif sur le marché.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {allDeals.filter(d => d.title?.toLowerCase().includes(dealSearch.toLowerCase()) || d.company?.toLowerCase().includes(dealSearch.toLowerCase())).length > DEALS_PER_PAGE && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-[10px] text-slate-500">
+                  Page {dealPage} / {Math.ceil(allDeals.filter(d => d.title?.toLowerCase().includes(dealSearch.toLowerCase()) || d.company?.toLowerCase().includes(dealSearch.toLowerCase())).length / DEALS_PER_PAGE)}
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setDealPage(p => Math.max(1, p - 1))}
+                    disabled={dealPage === 1}
+                    className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-lg disabled:opacity-40 transition-all"
+                  >
+                    ← Préc.
+                  </button>
+                  <button
+                    onClick={() => setDealPage(p => p + 1)}
+                    disabled={dealPage >= Math.ceil(allDeals.filter(d => d.title?.toLowerCase().includes(dealSearch.toLowerCase()) || d.company?.toLowerCase().includes(dealSearch.toLowerCase())).length / DEALS_PER_PAGE)}
+                    className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-lg disabled:opacity-40 transition-all"
+                  >
+                    Suiv. →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
 
         </div>
       </main>
@@ -684,11 +816,26 @@ export default function AdminDashboard() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase">Rôle / Fonction *</label>
+                <select 
+                  value={newUserData.role || 'commercial'} 
+                  onChange={e => setNewUserData({...newUserData, role: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="commercial">Commercial / Vente</option>
+                  <option value="marketing">Marketing</option>
+                  <option value="rh">Ressources Humaines (RH)</option>
+                  <option value="autre">Autre service</option>
+                  <option value="admin">Administrateur</option>
+                </select>
+              </div>
             </div>
             
             <div className="flex gap-3 pt-2 border-t border-slate-800">
               <button type="button" onClick={() => setShowUserModal(false)} className="flex-1 py-2.5 border border-slate-800 rounded-xl text-xs text-slate-400">Annuler</button>
-              <button type="submit" disabled={actionLoading} className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold rounded-xl text-xs">{actionLoading ? "Création..." : "Créer l'Accès Agent"}</button>
+              <button type="submit" disabled={actionLoading} className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold rounded-xl text-xs">{actionLoading ? "Création..." : "Créer l'Accès"}</button>
             </div>
           </form>
         </div>

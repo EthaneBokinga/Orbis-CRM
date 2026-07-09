@@ -32,10 +32,11 @@ exports.getAdminStats = async (req, res) => {
   }
 };
 
-// === 2. LISTE DES COMMERCIAUX AVEC NB DE DEALS ===
+// === 2. LISTE DE TOUTE L'ÉQUIPE AVEC NB DE DEALS ===
 exports.getCommercials = async (req, res) => {
   try {
-    const commercials = await User.find({ role: 'commercial' }).select('name email role isActive');
+    // Récupérer tous les utilisateurs
+    const users = await User.find({}).select('name email role isActive avatarUrl');
 
     // Agrégation du nombre de deals par commercial
     const dealCounts = await Deal.aggregate([
@@ -44,21 +45,50 @@ exports.getCommercials = async (req, res) => {
 
     const countMap = {};
     dealCounts.forEach(dc => {
-      countMap[dc._id.toString()] = dc.dealCount;
+      if (dc._id) {
+        countMap[dc._id.toString()] = dc.dealCount;
+      }
     });
 
-    const result = commercials.map(c => ({
-      _id: c._id,
-      name: c.name,
-      email: c.email,
-      role: c.role,
-      isActive: c.isActive !== false, // Valeur par défaut true
-      dealCount: countMap[c._id.toString()] || 0
+    const result = users.map(u => ({
+      _id: u._id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      avatarUrl: u.avatarUrl,
+      isActive: u.isActive !== false, // Valeur par défaut true
+      dealCount: countMap[u._id.toString()] || 0
     }));
 
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: "Erreur récupération commerciaux." });
+    res.status(500).json({ error: "Erreur récupération de l'équipe." });
+  }
+};
+
+// === 2b. MODIFICATION DU RÔLE D'UN MEMBRE (PUT /users/:id/role) ===
+exports.changeUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    const allowedRoles = ['admin', 'commercial', 'marketing', 'rh', 'autre'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ error: "Rôle invalide." });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+
+    if (user._id.toString() === req.user.id) {
+      return res.status(400).json({ error: "Action interdite : vous ne pouvez pas modifier votre propre rôle." });
+    }
+
+    user.role = role;
+    await user.save();
+
+    logAudit(req.user.id, req.user.name, `Rôle de ${user.name} modifié en "${role}".`, 'warning');
+    res.json({ message: `Le rôle a été mis à jour avec succès : ${role}.`, user });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur modification rôle." });
   }
 };
 
@@ -117,22 +147,29 @@ exports.createDeal = async (req, res) => {
       return res.status(400).json({ error: "Champs requis manquants." });
     }
  
-    // Valider si le commercial de destination existe et est actif
-    const commercial = await User.findOne({ _id: assignedTo, role: 'commercial', isActive: true });
-    if (!commercial) {
-      return res.status(404).json({ error: "Commercial assigné introuvable ou inactif." });
+    let isPublic = assignedTo === 'public';
+    let targetOwnerId = null;
+
+    if (!isPublic) {
+      // Valider si le commercial de destination existe et est actif
+      const targetUser = await User.findOne({ _id: assignedTo, isActive: true });
+      if (!targetUser) {
+        return res.status(404).json({ error: "Utilisateur assigné introuvable ou inactif." });
+      }
+      targetOwnerId = targetUser._id;
     }
  
     // Trouver ou créer automatiquement un contact d'entreprise pour l'association Mongoose obligatoire
     const Contact = require('../models/Contact');
-    let contact = await Contact.findOne({ company, assignedTo });
+    let contact = await Contact.findOne({ company });
     if (!contact) {
       contact = new Contact({
         firstName: "Contact",
         lastName: company,
         phone: "+242 06 000 00 00",
+        email: "contact@" + company.toLowerCase().replace(/\s+/g, '') + ".com",
         company: company,
-        assignedTo: assignedTo,
+        assignedTo: targetOwnerId || req.user.id, // Si public, assigner à l'admin créateur
         createdBy: req.user.id
       });
       await contact.save();
@@ -144,7 +181,7 @@ exports.createDeal = async (req, res) => {
       amount: Number(amount),
       stage: 'découverte',
       probability: 10,
-      ownedBy: assignedTo
+      ownedBy: targetOwnerId || undefined // undefined en mongoose n'enregistre pas la clé (donc deal public)
     });
  
     await deal.save();
@@ -256,20 +293,37 @@ exports.getAuditLogs = async (req, res) => {
   }
 };
 
-// === 10. MISE À JOUR DE L'OBJECTIF MENSUEL (PUT /settings/goal) ===
+// === 10. RÉCUPÉRATION DES PARAMÈTRES (GET /settings) ===
+exports.getSettings = async (req, res) => {
+  try {
+    const Settings = require('../models/Settings');
+    let settings = await Settings.findOne({});
+    if (!settings) {
+      settings = await Settings.create({});
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Erreur récupération des paramètres." });
+  }
+};
+
+// === 11. MISE À JOUR DE L'OBJECTIF PAR PÉRIODE (PUT /settings/goal) ===
 exports.updateGoal = async (req, res) => {
   try {
-    const { monthlyGoal } = req.body;
-    const goal = Number(monthlyGoal);
-    if (!goal || goal <= 0) {
+    const { goal, period } = req.body; // period = 'weekly' | 'monthly' | 'yearly'
+    const goalValue = Number(goal);
+    if (!goalValue || goalValue <= 0) {
       return res.status(400).json({ error: "Objectif invalide." });
     }
-    // Stocker dans un modèle simple Settings ou directement en variable globale process
-    // Pour éviter une dépendance lourde, on stocke dans un document Settings upsert
+    const allowedPeriods = ['weekly', 'monthly', 'yearly'];
+    const targetPeriod = allowedPeriods.includes(period) ? period : 'monthly';
+    const fieldToUpdate = { [`${targetPeriod}Goal`]: goalValue };
+
     const Settings = require('../models/Settings');
-    await Settings.findOneAndUpdate({}, { monthlyGoal: goal }, { upsert: true, new: true });
-    logAudit(req.user.id, req.user.name, `Objectif mensuel mis à jour : ${goal.toLocaleString('fr-FR')} FCFA.`, 'info');
-    res.json({ message: `Objectif mensuel fixé à ${goal.toLocaleString('fr-FR')} FCFA.`, monthlyGoal: goal });
+    const updated = await Settings.findOneAndUpdate({}, fieldToUpdate, { upsert: true, new: true });
+    const periodLabel = { weekly: 'hebdomadaire', monthly: 'mensuel', yearly: 'annuel' }[targetPeriod];
+    logAudit(req.user.id, req.user.name, `Objectif ${periodLabel} mis à jour : ${goalValue.toLocaleString('fr-FR')} FCFA.`, 'info');
+    res.json({ message: `Objectif ${periodLabel} fixé à ${goalValue.toLocaleString('fr-FR')} FCFA.`, settings: updated });
   } catch (err) {
     console.error("Erreur mise à jour objectif :", err);
     res.status(500).json({ error: "Erreur lors de la mise à jour de l'objectif." });

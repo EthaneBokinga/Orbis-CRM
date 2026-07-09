@@ -90,10 +90,13 @@ export default function CommercialDashboard({ onLogout }) {
   const [selectedDeal, setSelectedDeal]   = useState(null); // Pour la timeline Vue 360°
   
   // --- États Formulaires ---
-  const [newContact, setNewContact] = useState({ firstName: '', lastName: '', company: '', phone: '', email: '', status: 'à_contacter' });
+  const [newContact, setNewContact] = useState({ firstName: '', lastName: '', company: '', phone: '', email: '', address: '', serviceConcerned: '', status: 'à_contacter' });
   const [newDeal, setNewDeal] = useState({ title: '', contact: '', amount: '', stage: 'découverte', probability: 10 });
   const [newInteraction, setNewInteraction] = useState({ type: 'appel', notes: '', nextActionDate: '' });
   const [stats, setStats] = useState({ pipeline: [], overdueReminders: 0 });
+
+  // --- Marché aux Leads (Deals Publics) ---
+  const [publicDeals, setPublicDeals] = useState([]);
 
   // Récupération du token d'authentification
   const getAuthHeader = () => {
@@ -122,8 +125,40 @@ export default function CommercialDashboard({ onLogout }) {
     }
   };
 
+  const fetchPublicDeals = async () => {
+    try {
+      const res = await fetch(`${API_URL}/deals/public`, getAuthHeader());
+      if (res.ok) {
+        const data = await res.json();
+        setPublicDeals(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Erreur de récupération des deals publics :", err);
+    }
+  };
+
+  const handleClaimDeal = async (dealId) => {
+    try {
+      const res = await fetch(`${API_URL}/deals/${dealId}/claim`, {
+        method: 'PUT',
+        ...getAuthHeader()
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("Lead récupéré avec succès ! Il figure désormais dans votre pipeline.", "success");
+        fetchData();
+        fetchPublicDeals();
+      } else {
+        showToast(data.error || "Erreur lors de la récupération du lead.", "error");
+      }
+    } catch (err) {
+      showToast("Erreur réseau.", "error");
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchPublicDeals();
   }, []);
 
   // === CHARGEMENT DES ÉCHANGES QUAND ON CLIQUE SUR UN CONTACT ===
@@ -148,7 +183,7 @@ export default function CommercialDashboard({ onLogout }) {
       if (response.ok) {
         const created = await response.json();
         setContacts([created, ...contacts]);
-        setNewContact({ firstName: '', lastName: '', company: '', phone: '', email: '', status: 'à_contacter' });
+        setNewContact({ firstName: '', lastName: '', company: '', phone: '', email: '', address: '', serviceConcerned: '', status: 'à_contacter' });
         setShowContactModal(false);
         showToast("Prospect créé avec succès.", "success");
       } else {
@@ -301,6 +336,12 @@ export default function CommercialDashboard({ onLogout }) {
             >
               Pipeline Kanban
             </button>
+            <button 
+              onClick={() => { setActiveTab('marketplace'); setSelectedContact(null); fetchPublicDeals(); }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${activeTab === 'marketplace' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-semibold shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Marché aux Leads
+            </button>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -341,34 +382,34 @@ export default function CommercialDashboard({ onLogout }) {
           <div className="space-y-8">
             {/* Cartes KPI */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl group hover:border-slate-700/60 transition-all duration-300">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-xl group hover:border-slate-350 dark:hover:border-slate-700/60 transition-all duration-300">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-2xl transform translate-x-8 -translate-y-8"></div>
-                <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Mon Pipeline Actif</p>
-                <p className="text-3xl font-extrabold text-white mt-2 font-mono tracking-tight">
-                  {totalPipeline.toLocaleString('fr-FR')} <span className="text-lg text-teal-400 font-sans font-normal">FCFA</span>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase">Mon Pipeline Actif</p>
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 font-mono tracking-tight">
+                  {totalPipeline.toLocaleString('fr-FR')} <span className="text-lg text-teal-600 dark:text-teal-400 font-sans font-normal">FCFA</span>
                 </p>
-                <div className="mt-4 flex items-center text-xs text-emerald-400 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2"></span> Valeur potentielle estimée
+                <div className="mt-4 flex items-center text-xs text-teal-600 dark:text-emerald-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-teal-600 dark:bg-emerald-400 animate-ping mr-2"></span> Valeur potentielle estimée
                 </div>
               </div>
 
-              <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl group hover:border-slate-700/60 transition-all duration-300">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-xl group hover:border-slate-350 dark:hover:border-slate-700/60 transition-all duration-300">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl transform translate-x-8 -translate-y-8"></div>
-                <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Contrats Gagnés</p>
-                <p className="text-3xl font-extrabold text-white mt-2 font-mono tracking-tight">
-                  {wonDealsCount} <span className="text-lg text-emerald-400 font-sans font-normal">Signé(s)</span>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase">Contrats Gagnés</p>
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 font-mono tracking-tight">
+                  {wonDealsCount} <span className="text-lg text-teal-600 dark:text-emerald-400 font-sans font-normal">Signé(s)</span>
                 </p>
-                <div className="mt-4 text-xs text-slate-400">Objectif mensuel en cours de validation</div>
+                <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">Objectif mensuel en cours de validation</div>
               </div>
 
-              <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl group hover:border-slate-700/60 transition-all duration-300">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-xl group hover:border-slate-350 dark:hover:border-slate-700/60 transition-all duration-300">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl transform translate-x-8 -translate-y-8"></div>
-                <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Relances en Retard</p>
-                <p className="text-3xl font-extrabold text-amber-400 mt-2 font-mono tracking-tight">
-                  {stats.overdueReminders} <span className="text-lg text-slate-400 font-sans font-normal">Action(s)</span>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase">Relances en Retard</p>
+                <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-2 font-mono tracking-tight">
+                  {stats.overdueReminders} <span className="text-lg text-slate-500 dark:text-slate-400 font-sans font-normal">Action(s)</span>
                 </p>
-                <div className="mt-4 text-xs text-slate-400 flex items-center">
-                  <span className={`w-1.5 h-1.5 rounded-full mr-2 ${stats.overdueReminders > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'}`}></span> 
+                <div className="mt-4 text-xs text-slate-550 dark:text-slate-400 flex items-center">
+                  <span className={`w-1.5 h-1.5 rounded-full mr-2 ${stats.overdueReminders > 0 ? 'bg-rose-500 animate-pulse' : 'bg-teal-600 dark:bg-emerald-400'}`}></span> 
                   {stats.overdueReminders > 0 ? 'Action(s) nécessitant attention urgente' : 'Aucun retard critique détecté'}
                 </div>
               </div>
@@ -492,24 +533,24 @@ export default function CommercialDashboard({ onLogout }) {
 
             {/* Fiche contact / interactions */}
             {selectedContact ? (
-              <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-2xl space-y-6 lg:sticky lg:top-24 animate-[fadeIn_0.3s_ease-out]">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-xl dark:shadow-2xl space-y-6 lg:sticky lg:top-24 animate-[fadeIn_0.3s_ease-out]">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
                   <div>
-                    <button onClick={() => setSelectedContact(null)} className="lg:hidden text-xs text-teal-400 mb-2 block">← Retour à la liste</button>
-                    <h3 className="text-xl font-bold text-white">{selectedContact.firstName} {selectedContact.lastName}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5 font-medium uppercase tracking-wider">{selectedContact.company || 'Sans entreprise'}</p>
+                    <button onClick={() => setSelectedContact(null)} className="lg:hidden text-xs text-teal-655 dark:text-teal-400 mb-2 block">← Retour à la liste</button>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">{selectedContact.firstName} {selectedContact.lastName}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium uppercase tracking-wider">{selectedContact.company || 'Sans entreprise'}</p>
                   </div>
                   <button 
                     onClick={() => setSelectedContact(null)}
-                    className="text-slate-400 hover:text-white hidden lg:block text-sm bg-slate-800 w-7 h-7 rounded-full flex items-center justify-center border border-slate-700"
+                    className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hidden lg:block text-sm bg-slate-100 dark:bg-slate-800 w-7 h-7 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-700"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 font-mono text-xs space-y-1 text-slate-300">
-                  <div><span className="text-slate-500">TEL:</span> {selectedContact.phone}</div>
-                  <div><span className="text-slate-500">MAIL:</span> {selectedContact.email || 'Non renseigné'}</div>
+                <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80 font-mono text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                  <div><span className="text-slate-400 dark:text-slate-500">TEL:</span> {selectedContact.phone}</div>
+                  <div><span className="text-slate-400 dark:text-slate-500">MAIL:</span> {selectedContact.email || 'Non renseigné'}</div>
                 </div>
 
                 {/* Saisie d'une interaction */}
@@ -683,6 +724,88 @@ export default function CommercialDashboard({ onLogout }) {
           </div>
         )}
 
+        {/* TAB 4: MARCHÉ AUX LEADS (DEALS PUBLICS) */}
+        {activeTab === 'marketplace' && (
+          <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  💼 Marché aux Leads <span className="text-[10px] font-mono bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full uppercase">Non Assignés</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">Prenez en main ces dossiers clients pour commencer à négocier et gagner de nouvelles commissions.</p>
+              </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Rechercher un lead..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-teal-500 w-44"
+                />
+                <button 
+                  onClick={fetchPublicDeals}
+                  className="px-3 py-2 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  🔄 Actualiser
+                </button>
+              </div>
+            </div>
+
+            {publicDeals.filter(d => d.title?.toLowerCase().includes(searchQuery.toLowerCase()) || d.company?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 rounded-2xl border border-dashed border-slate-800 text-center bg-slate-900/5 py-16">
+                <p className="text-2xl mb-2">🎉</p>
+                <p className="text-sm font-semibold text-slate-400">Le marché est vide !</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">Tous les leads ont été assignés ou récupérés. L'administration injectera bientôt de nouvelles opportunités.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {publicDeals
+                  .filter(d => d.title?.toLowerCase().includes(searchQuery.toLowerCase()) || d.company?.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(deal => (
+                    <div 
+                      key={deal._id} 
+                      className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-xl hover:border-teal-500/30 transition-all duration-300 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex justify-between items-start gap-2 mb-3">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-teal-655 dark:text-emerald-400 text-[10px] font-bold font-mono uppercase tracking-wider">
+                            Lead Public
+                          </span>
+                          <span className="text-xs font-black text-teal-655 dark:text-emerald-400 font-mono">
+                            {deal.amount?.toLocaleString('fr-FR')} F
+                          </span>
+                        </div>
+
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1">{deal.title}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium uppercase tracking-wider">{deal.contact?.company || 'Sans entreprise'}</p>
+
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Contact principal :</p>
+                          <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800/40 text-xs space-y-1 text-slate-700 dark:text-slate-300 font-mono">
+                            <div>👤 {deal.contact ? `${deal.contact.firstName} ${deal.contact.lastName}` : 'Inconnu'}</div>
+                            {deal.contact?.phone && <div>📞 {deal.contact.phone}</div>}
+                            {deal.contact?.email && <div className="truncate">✉️ {deal.contact.email}</div>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6">
+                        <button
+                          onClick={() => handleClaimDeal(deal._id)}
+                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/10 hover:opacity-95 active:scale-[0.98] transition-all"
+                        >
+                          📥 Récupérer ce lead
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
 
       {/* ================= MODAL AJOUT CONTACT ================= */}
@@ -746,14 +869,36 @@ export default function CommercialDashboard({ onLogout }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Adresse Email <span className="text-slate-600 normal-case">(optionnel)</span></label>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Adresse Email *</label>
                 <input
-                  type="email"
+                  type="email" required
                   placeholder="ex: contact@entreprise.com"
                   value={newContact.email}
                   onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Adresse</label>
+                  <input
+                    type="text"
+                    placeholder="ex: Centre-ville, Brazzaville"
+                    value={newContact.address}
+                    onChange={(e) => setNewContact({ ...newContact, address: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Service Concerné</label>
+                  <input
+                    type="text"
+                    placeholder="ex: Informatique, Achats"
+                    value={newContact.serviceConcerned}
+                    onChange={(e) => setNewContact({ ...newContact, serviceConcerned: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all duration-200"
+                  />
+                </div>
               </div>
 
               <div className="flex space-x-3 pt-3 border-t border-slate-800">

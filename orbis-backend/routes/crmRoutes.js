@@ -22,8 +22,10 @@ router.get('/activities/:dealId', activityController.getActivitiesByDeal);
 router.post('/activities', activityController.createActivity);
 
 // Routes Deals (Pipeline Kanban)
+router.get('/deals/public', crmController.getPublicDeals);
 router.get('/deals', crmController.getDeals);
 router.post('/deals', validateDeal, crmController.createDeal);
+router.put('/deals/:id/claim', crmController.claimDeal);
 router.put('/deals/:id', validateDeal, crmController.updateDeal);
 router.put('/deals/:id/stage', crmController.updateDealStage);
 

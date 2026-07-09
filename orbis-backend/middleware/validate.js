@@ -1,8 +1,8 @@
 // Middleware de validation rapide et robuste pour le MVP
 const validateContact = (req, res, next) => {
-  const { firstName, lastName, phone, status } = req.body;
-  if (!firstName || !lastName || !phone) {
-    return res.status(400).json({ error: "Le prénom, le nom et le téléphone sont obligatoires." });
+  const { firstName, lastName, phone, email, status } = req.body;
+  if (!firstName || !lastName || !phone || !email) {
+    return res.status(400).json({ error: "Le prénom, le nom, le téléphone et l'email sont obligatoires." });
   }
   if (status && !['à_contacter', 'en_cours', 'gagné', 'perdu'].includes(status)) {
     return res.status(400).json({ error: "Statut de contact invalide." });

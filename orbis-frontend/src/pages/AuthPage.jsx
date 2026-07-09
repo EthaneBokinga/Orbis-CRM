@@ -3,6 +3,8 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
+
 
 const API_AUTH_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/auth` 
@@ -39,6 +41,7 @@ export default function AuthPage({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const emailValid = EMAIL_REGEX.test(formData.email);
   const emailHint = formData.email.length === 0 ? null : emailValid ? '✅' : '❌';
@@ -141,7 +144,8 @@ export default function AuthPage({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4 relative overflow-hidden selection:bg-teal-500 selection:text-slate-950">
+    <>
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4 relative overflow-hidden selection:bg-teal-500 selection:text-slate-950">
       
       {/* HALOS LUMINEUX PREMIUM EN ARRIÈRE-PLAN (ZÉRO IMAGE, FLUIDITÉ MAXIMALE) */}
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-teal-500/10 rounded-full blur-[140px] pointer-events-none"></div>
@@ -316,6 +320,17 @@ export default function AuthPage({ onLoginSuccess }) {
               isLogin ? "Se connecter" : "Valider l'inscription"
             )}
           </button>
+          {isLogin && (
+            <div className="text-right -mt-1">
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-xs text-teal-400 hover:text-teal-300 hover:underline transition-colors"
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
+          )}
         </form>
 
         {/* SÉPARATEUR */}
@@ -354,5 +369,11 @@ export default function AuthPage({ onLoginSuccess }) {
 
       </div>
     </div>
+
+    {/* Modal Mot de passe oublié */}
+    {showForgotModal && (
+      <ForgotPasswordModal onClose={() => setShowForgotModal(false)} />
+    )}
+    </>
   );
 }

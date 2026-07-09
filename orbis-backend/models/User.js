@@ -8,7 +8,9 @@ const userSchema = new mongoose.Schema({
   authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   googleId: { type: String, unique: true, sparse: true },
   avatarUrl: { type: String, default: '' },
-  role: { type: String, enum: ['admin', 'commercial'], default: 'commercial' },
+  role: { type: String, enum: ['admin', 'commercial', 'marketing', 'rh', 'autre'], default: 'commercial' },
+  resetCode: { type: String, default: null },
+  resetCodeExpires: { type: Date, default: null },
   isActive: { type: Boolean, default: true },
   refreshTokenHash: { type: String, select: false }
 }, { timestamps: true });

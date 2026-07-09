@@ -13,10 +13,12 @@ router.put('/deals/:id/reassign', adminController.reassignDeal);
 router.post('/deals', adminController.createDeal);
 router.post('/users', adminController.createUser);
 router.put('/users/:id/toggle-status', adminController.toggleUserStatus);
+router.put('/users/:id/role', adminController.changeUserRole);
 router.delete('/deals/:id', adminController.deleteDeal);
 
-// Nouvelles routes — Journal d'audit & Configuration
+// Journal d'audit & Configuration
 router.get('/logs', adminController.getAuditLogs);
+router.get('/settings', adminController.getSettings);
 router.put('/settings/goal', adminController.updateGoal);
 
 module.exports = router;

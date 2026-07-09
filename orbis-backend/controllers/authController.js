@@ -214,3 +214,126 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// === 5. RÉINITIALISATION DE MOT DE PASSE (MOT DE PASSE OUBLIÉ) ===
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "L'adresse email est requise." });
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      // Pour éviter le dénombrement d'utilisateurs, on renvoie un succès générique
+      return res.json({ message: "Si cet email existe, un code de réinitialisation y a été envoyé." });
+    }
+
+    // Génère un code secret à 6 chiffres
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetCode = code;
+    user.resetCodeExpires = Date.now() + 15 * 60 * 1000; // Valide 15 min
+    await user.save();
+
+    // Envoi de l'email via Nodemailer
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER || 'bokingaethanenathan@gmail.com',
+        pass: process.env.SMTP_PASS || '' // À configurer sur Render
+      }
+    });
+
+    const mailOptions = {
+      from: `"Orbis CRM Securité" <${process.env.SMTP_USER || 'bokingaethanenathan@gmail.com'}>`,
+      to: cleanEmail,
+      subject: "🔒 Code de réinitialisation de votre mot de passe Orbis CRM",
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 40px; border-radius: 16px; max-width: 500px; margin: auto;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #0d9488; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: 2px;">ORBIS CRM</h1>
+            <p style="font-size: 10px; color: #64748b; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px;">Secured Authorization Portal</p>
+          </div>
+          
+          <div style="background-color: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; text-align: center;">
+            <p style="font-size: 14px; color: #cbd5e1; margin-top: 0;">Bonjour <strong>${user.name}</strong>,</p>
+            <p style="font-size: 13px; color: #94a3b8; line-height: 1.6;">Vous avez demandé la réinitialisation de votre mot de passe Orbis CRM. Voici votre code secret temporaire :</p>
+            
+            <div style="background-color: #0f172a; color: #0d9488; font-size: 32px; font-weight: 800; padding: 15px 25px; border-radius: 10px; display: inline-block; letter-spacing: 6px; margin: 20px 0; border: 1px dashed #0d9488;">
+              ${code}
+            </div>
+            
+            <p style="font-size: 11px; color: #64748b; margin-bottom: 0;">Ce code est strictement confidentiel et expirera dans 15 minutes.</p>
+          </div>
+          
+          <p style="font-size: 11px; color: #475569; text-align: center; margin-top: 30px; line-height: 1.5;">
+            Si vous n'avez pas demandé ce changement, ignorez cet e-mail en toute sécurité.<br/>
+            &copy; 2026 Orbis CRM - Tous droits réservés.
+          </p>
+        </div>
+      `
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`[SMTP] Code envoyé à ${cleanEmail}`);
+    } catch (mailErr) {
+      console.warn(`[SMTP] Échec d'envoi de mail à ${cleanEmail} :`, mailErr.message);
+      console.log(`[DEV MODE] CODE SECRET POUR ${cleanEmail} IS : ${code}`);
+      // En mode dev, on permet de récupérer le code s'il n'y a pas d'SMTP configuré pour ne pas bloquer l'utilisateur
+      if (!process.env.SMTP_PASS) {
+        return res.json({ 
+          message: "Si cet email existe, un code de réinitialisation y a été envoyé.",
+          _devCode: code // Fourni uniquement si SMTP_PASS n'est pas configuré pour faciliter les tests
+        });
+      }
+    }
+
+    res.json({ message: "Si cet email existe, un code de réinitialisation y a été envoyé." });
+  } catch (err) {
+    console.error("Erreur forgotPassword :", err);
+    res.status(500).json({ error: "Erreur interne lors du traitement." });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: "Tous les champs sont requis." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ 
+      email: cleanEmail,
+      resetCode: code,
+      resetCodeExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Code invalide ou expiré." });
+    }
+
+    // Réinitialise le mot de passe
+    user.passwordHash = newPassword;
+    user.resetCode = null;
+    user.resetCodeExpires = null;
+    await user.save();
+
+    // Log d'audit
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      actorId: user._id,
+      actorName: user.name,
+      actionDescription: "Mot de passe réinitialisé avec succès par formulaire de récupération.",
+      severity: 'warning'
+    }).catch(() => {});
+
+    res.json({ message: "Votre mot de passe a été modifié avec succès." });
+  } catch (err) {
+    console.error("Erreur resetPassword :", err);
+    res.status(500).json({ error: "Erreur lors de la modification du mot de passe." });
+  }
+};
+

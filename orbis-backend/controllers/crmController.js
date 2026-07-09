@@ -164,3 +164,41 @@ exports.getDashboardStats = async (req, res) => {
     res.status(500).json({ error: "Erreur lors du calcul des statistiques analytiques." });
   }
 };
+
+// === 5. DEALS PUBLICS — MARCHÉ DES LEADS NON ASSIGNÉS ===
+exports.getPublicDeals = async (req, res) => {
+  try {
+    const deals = await Deal.find({
+      $or: [{ ownedBy: null }, { ownedBy: { $exists: false } }]
+    }).populate('contact', 'firstName lastName company email phone');
+    res.json(deals);
+  } catch (err) {
+    res.status(500).json({ error: "Erreur récupération des deals publics." });
+  }
+};
+
+exports.claimDeal = async (req, res) => {
+  try {
+    const deal = await Deal.findById(req.params.id);
+    if (!deal) return res.status(404).json({ error: "Deal introuvable." });
+
+    if (deal.ownedBy) {
+      return res.status(400).json({ error: "Ce deal a déjà été récupéré par un commercial." });
+    }
+
+    deal.ownedBy = req.user.id;
+    await deal.save();
+
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      actorId: req.user.id,
+      actorName: req.user.name,
+      actionDescription: `Deal public "${deal.title}" récupéré par ${req.user.name}.`,
+      severity: 'info'
+    }).catch(() => {});
+
+    res.json({ message: "Deal récupéré avec succès ! Il figure désormais dans votre pipeline.", deal });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur lors de la récupération du deal." });
+  }
+};

@@ -213,4 +213,67 @@ html:not(.dark) ::selection {
   color: #0f172a !important;
 }
 
+/* ============================================================
+   FIX CRITIQUE : KPI GRADIENT CARDS EN MODE CLAIR
+   Les éléments avec bg-gradient-to-b from-slate-900 to-slate-950
+   utilisent background-image (gradient), qui prime sur background-color.
+   On doit forcer background-image:none + background-color blanc.
+   ============================================================ */
+html:not(.dark) [class*="bg-gradient-to-b"][class*="from-slate-9"],
+html:not(.dark) [class*="bg-gradient-to-b"][class*="from-slate-8"],
+html:not(.dark) [class*="bg-gradient-to-r"][class*="from-slate-9"],
+html:not(.dark) [class*="bg-gradient-to-r"][class*="from-slate-8"] {
+  background-image: none !important;
+  background-color: #ffffff !important;
+}
+
+/* Éléments statiques sombres restants en mode clair */
+html:not(.dark) .from-slate-900,
+html:not(.dark) .to-slate-950,
+html:not(.dark) .from-slate-800 {
+  --tw-gradient-from: #ffffff !important;
+  --tw-gradient-to: #f8fafc !important;
+}
+
+/* ============================================================
+   FIX RESPONSIVITÉ MOBILE — prévenir le scroll horizontal
+   ============================================================ */
+html, body, #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Navigation mobile : permettre le retour à la ligne */
+@media (max-width: 768px) {
+  nav .flex.items-center.justify-between {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    min-height: auto;
+  }
+  
+  /* Réduire la taille des boutons nav sur mobile */
+  nav button, nav a {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* Tableaux scrollables horizontalement sur mobile */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Grilles KPI en colonne sur mobile */
+  .grid.grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Classe utilitaire pour les conteneurs de tableaux mobiles */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
