@@ -7,6 +7,7 @@ import { ToastProvider } from './components/UI/Toast';
 import AuthPage from './pages/AuthPage';
 import CommercialDashboard from './pages/CommercialDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import PWAInstallBanner from './components/PWAInstallBanner';
 
 // ID Client Google Cloud réel
 const GOOGLE_CLIENT_ID = '888553843615-o50pub4r34o8tssooskbsgr18rkcfq6q.apps.googleusercontent.com';
@@ -65,35 +66,38 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <BrowserRouter>
-              <Routes>
-                {/* ROUTE PUBLIQUE : Authentification (Formulaire + Google) */}
-                <Route path="/" element={<AuthPage />} />
+            <>
+              <BrowserRouter>
+                <Routes>
+                  {/* ROUTE PUBLIQUE : Authentification (Formulaire + Google) */}
+                  <Route path="/" element={<AuthPage />} />
 
-                {/* ROUTE PROTÉGÉE : Espace Commercial */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <CommercialDashboard />
-                    </ProtectedRoute>
-                  }
-                />
+                  {/* ROUTE PROTÉGÉE : Espace Commercial */}
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <CommercialDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* ROUTE PROTÉGÉE CRITIQUE : Espace Super-Admin (rôle 'admin' uniquement) */}
-                <Route
-                  path="/admin"
-                  element={
-                    <ProtectedRoute allowedRole="admin">
-                      <AdminDashboard />
-                    </ProtectedRoute>
-                  }
-                />
+                  {/* ROUTE PROTÉGÉE CRITIQUE : Espace Super-Admin (rôle 'admin' uniquement) */}
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute allowedRole="admin">
+                        <AdminDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* REDIRECTION AUTOMATIQUE : Toute URL inconnue → Login */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </BrowserRouter>
+                  {/* REDIRECTION AUTOMATIQUE : Toute URL inconnue → Login */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </BrowserRouter>
+              <PWAInstallBanner />
+            </>
           )}
         </ToastProvider>
       </ThemeProvider>
