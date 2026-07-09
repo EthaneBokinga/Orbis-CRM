@@ -46,10 +46,10 @@ async function seedAdminIfMissing() {
     // Supprimer l'ancien admin de test s'il existe
     await User.deleteOne({ email: 'admin@orbis-crm.com' });
 
-    // Admin 1 : Ethan Bokinga
-    const admin1Exists = await User.findOne({ email: 'ethanebokinga00@gmail.com' });
-    if (!admin1Exists) {
-      const adminUser = new User({
+    // ▸ Admin 1 : Ethan Bokinga
+    let a1 = await User.findOne({ email: 'ethanebokinga00@gmail.com' });
+    if (!a1) {
+      a1 = new User({
         name: 'Ethan Bokinga (Admin)',
         email: 'ethanebokinga00@gmail.com',
         passwordHash: 'NTHBG1234@',
@@ -57,16 +57,22 @@ async function seedAdminIfMissing() {
         role: 'admin',
         isActive: true
       });
-      await adminUser.save();
-      console.log('=== ORBIS SEEDER === ✓ Compte Admin créé : ethanebokinga00@gmail.com / NTHBG1234@');
+      await a1.save();
+      console.log('=== ORBIS SEEDER === ✓ Admin créé : ethanebokinga00@gmail.com');
     } else {
-      console.log('=== ORBIS SEEDER === ✓ Admin existant détecté (ethanebokinga00@gmail.com).');
+      if (!a1.isActive) {
+        a1.isActive = true;
+        await a1.save();
+        console.log('=== ORBIS SEEDER === 🔄 Admin réactivé : ethanebokinga00@gmail.com');
+      } else {
+        console.log('=== ORBIS SEEDER === ✓ Admin OK : ethanebokinga00@gmail.com');
+      }
     }
 
-    // Admin 2 : Soise Gallouo
-    const admin2Exists = await User.findOne({ email: 'soisegallouo@gmail.com' });
-    if (!admin2Exists) {
-      const adminUser2 = new User({
+    // ▸ Admin 2 : Soise Gallouo
+    let a2 = await User.findOne({ email: 'soisegallouo@gmail.com' });
+    if (!a2) {
+      a2 = new User({
         name: 'Soise Gallouo (Admin)',
         email: 'soisegallouo@gmail.com',
         passwordHash: 'NTHBG1234@',
@@ -74,13 +80,19 @@ async function seedAdminIfMissing() {
         role: 'admin',
         isActive: true
       });
-      await adminUser2.save();
-      console.log('=== ORBIS SEEDER === ✓ Compte Admin créé : soisegallouo@gmail.com / NTHBG1234@');
+      await a2.save();
+      console.log('=== ORBIS SEEDER === ✓ Admin créé : soisegallouo@gmail.com');
     } else {
-      console.log('=== ORBIS SEEDER === ✓ Admin existant détecté (soisegallouo@gmail.com).');
+      if (!a2.isActive) {
+        a2.isActive = true;
+        await a2.save();
+        console.log('=== ORBIS SEEDER === 🔄 Admin réactivé : soisegallouo@gmail.com');
+      } else {
+        console.log('=== ORBIS SEEDER === ✓ Admin OK : soisegallouo@gmail.com');
+      }
     }
   } catch (err) {
-    console.error('=== ORBIS SEEDER === ✗ Erreur lors du seeding admin :', err.message);
+    console.error('=== ORBIS SEEDER === ✗ Erreur :', err.message);
   }
 }
 
