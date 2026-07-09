@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, Eye, EyeOff, ShieldAlert } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, ShieldAlert, Check, X } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
 
 // ─── Directive §1 : Regex email stricte ───
@@ -39,7 +39,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
   // ─── Calculs temps réel ───
   const emailValid     = EMAIL_REGEX.test(email);
-  const emailHint      = email.length === 0 ? null : emailValid ? '✅' : '❌';
+  const emailHint      = email.length === 0 ? null : emailValid ? 'ok' : 'bad';
   const { count, percent } = getStrength(password);
   const strengthCfg    = STRENGTH_CONFIG[percent] || STRENGTH_CONFIG[0];
   const isStrong       = percent === 100;
@@ -47,7 +47,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
   // ─── Directive §1 : Blocage presse-papier mot de passe ───
   const blockClipboard = (e) => {
     e.preventDefault();
-    showToast('⚠️ Copier / Coller désactivé sur ce champ pour votre sécurité.', 'warning');
+    showToast('Copier / Coller désactivé sur ce champ pour votre sécurité.', 'warning');
   };
 
   const handleSubmit = async (e) => {
@@ -143,7 +143,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               />
               {emailHint && (
                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm">
-                  {emailHint}
+                  {emailHint === 'ok' ? <Check className="text-emerald-500" /> : <X className="text-rose-500" />}
                 </span>
               )}
             </div>

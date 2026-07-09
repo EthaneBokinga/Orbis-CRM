@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Phone, Mail, Users, CheckSquare, Plus, Loader2, Clock, X } from 'lucide-react';
+import { Phone, Mail, Users, CheckSquare, Plus, Loader2, Clock, X, Calendar } from 'lucide-react';
 import { useToast } from './UI/Toast';
 
 const API_URL = import.meta.env.VITE_API_URL 
@@ -21,9 +21,8 @@ function timeAgo(date) {
   return `il y a ${Math.floor(diff / 86400)} j`;
 }
 
-function getAuthHeader() {
-  const token = localStorage.getItem('token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+function getAuthHeader(isJson = true) {
+  return isJson ? { credentials: 'include', headers: { 'Content-Type': 'application/json' } } : { credentials: 'include' };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -130,10 +129,10 @@ export default function ActivityTimeline({ dealId, dealTitle, onClose }) {
               onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
               className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
             >
-              <option value="call">📞 Appel</option>
-              <option value="email">✉️ E-mail</option>
-              <option value="meeting">👥 Réunion</option>
-              <option value="task">✅ Tâche</option>
+              <option value="call">Appel</option>
+              <option value="email">E-mail</option>
+              <option value="meeting">Réunion</option>
+              <option value="task">Tâche</option>
             </select>
             <input
               type="date"
@@ -207,8 +206,9 @@ export default function ActivityTimeline({ dealId, dealTitle, onClose }) {
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{act.description}</p>
                       )}
                       {act.dueDate && (
-                        <p className="text-xs text-slate-400 mt-1.5">
-                          📅 {new Date(act.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
+                          <Calendar size={14} />
+                          {new Date(act.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
                         </p>
                       )}
                     </div>

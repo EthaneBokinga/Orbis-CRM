@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/UI/Toast';
 import ThemeToggle from '../components/ThemeToggle';
 import ActivityTimeline from '../components/ActivityTimeline';
+import { X, User, Phone, Mail, Inbox, Clipboard, Clock, ChevronRight, ChevronLeft, RefreshCw, Confetti, Plus } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/crm` 
@@ -100,8 +101,10 @@ export default function CommercialDashboard({ onLogout }) {
 
   // Récupération du token d'authentification
   const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
-    return { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+    return {
+      credentials: 'include',
+      headers: isJson ? { 'Content-Type': 'application/json' } : undefined
+    };
   };
 
   // === CHARGEMENT DES DONNÉES DEPUIS LE BACKEND ===
@@ -112,6 +115,9 @@ export default function CommercialDashboard({ onLogout }) {
         fetch(`${API_URL}/contacts`, getAuthHeader()).then(r => r.json()),
         fetch(`${API_URL}/deals`, getAuthHeader()).then(r => r.json()),
         fetch(`${API_URL}/dashboard/stats`, getAuthHeader()).then(r => r.json())
+        fetch(`${API_URL}/contacts`, getAuthHeader(false)).then(r => r.json()),
+        fetch(`${API_URL}/deals`, getAuthHeader(false)).then(r => r.json()),
+        fetch(`${API_URL}/dashboard/stats`, getAuthHeader(false)).then(r => r.json())
       ]);
 
       setContacts(Array.isArray(resContacts) ? resContacts : []);
@@ -128,6 +134,7 @@ export default function CommercialDashboard({ onLogout }) {
   const fetchPublicDeals = async () => {
     try {
       const res = await fetch(`${API_URL}/deals/public`, getAuthHeader());
+        const res = await fetch(`${API_URL}/deals/public`, getAuthHeader(false));
       if (res.ok) {
         const data = await res.json();
         setPublicDeals(Array.isArray(data) ? data : []);
@@ -141,7 +148,7 @@ export default function CommercialDashboard({ onLogout }) {
     try {
       const res = await fetch(`${API_URL}/deals/${dealId}/claim`, {
         method: 'PUT',
-        ...getAuthHeader()
+        ...getAuthHeader(false)
       });
       const data = await res.json();
       if (res.ok) {
@@ -165,6 +172,7 @@ export default function CommercialDashboard({ onLogout }) {
   useEffect(() => {
     if (selectedContact) {
       fetch(`${API_URL}/interactions/${selectedContact._id}`, getAuthHeader())
+          fetch(`${API_URL}/interactions/${selectedContact._id}`, getAuthHeader(false))
         .then(r => r.json())
         .then(data => setInteractions(Array.isArray(data) ? data : []))
         .catch(err => console.error("Erreur interactions :", err));
@@ -544,7 +552,7 @@ export default function CommercialDashboard({ onLogout }) {
                     onClick={() => setSelectedContact(null)}
                     className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hidden lg:block text-sm bg-slate-100 dark:bg-slate-800 w-7 h-7 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-700"
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
@@ -614,8 +622,8 @@ export default function CommercialDashboard({ onLogout }) {
                           </div>
                           <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/30 p-2 rounded-lg border border-slate-800/40">{i.notes}</p>
                           {i.nextActionDate && (
-                            <div className="text-[10px] text-amber-400 font-medium">⏰ Relance prévue le : {new Date(i.nextActionDate).toLocaleDateString('fr-FR')}</div>
-                          )}
+                                  <div className="text-[10px] text-amber-400 font-medium"><Clock className="inline-block w-4 h-4 mr-1" />Relance prévue le : {new Date(i.nextActionDate).toLocaleDateString('fr-FR')}</div>
+                                )}
                         </div>
                       ))
                     )}
@@ -675,7 +683,7 @@ export default function CommercialDashboard({ onLogout }) {
                             {/* Controles Kanban */}
                              <div className="flex items-center justify-between pt-2 border-t border-slate-800/50 mt-1">
                                {/* Bouton Vue 360° */}
-                               <button
+                                 <button
                                  onClick={(e) => { e.stopPropagation(); setSelectedDeal(selectedDeal?._id === deal._id ? null : deal); }}
                                  className={`text-[10px] font-semibold px-2 py-1 rounded-lg border transition-all ${
                                    selectedDeal?._id === deal._id
@@ -683,7 +691,7 @@ export default function CommercialDashboard({ onLogout }) {
                                      : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-teal-400 hover:border-teal-500/30'
                                  }`}
                                >
-                                 📋 Vue 360°
+                                 <Clipboard className="inline-block w-4 h-4 mr-1" />Vue 360°
                                </button>
 
                                {/* Avance / Recule Kanban */}
@@ -730,7 +738,7 @@ export default function CommercialDashboard({ onLogout }) {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  💼 Marché aux Leads <span className="text-[10px] font-mono bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full uppercase">Non Assignés</span>
+                  <Inbox className="inline-block w-5 h-5 mr-1" />Marché aux Leads <span className="text-[10px] font-mono bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full uppercase">Non Assignés</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">Prenez en main ces dossiers clients pour commencer à négocier et gagner de nouvelles commissions.</p>
               </div>
@@ -743,18 +751,18 @@ export default function CommercialDashboard({ onLogout }) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-teal-500 w-44"
                 />
-                <button 
+                  <button 
                   onClick={fetchPublicDeals}
                   className="px-3 py-2 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
                 >
-                  🔄 Actualiser
+                  <RefreshCw className="w-4 h-4 mr-1" />Actualiser
                 </button>
               </div>
             </div>
 
-            {publicDeals.filter(d => d.title?.toLowerCase().includes(searchQuery.toLowerCase()) || d.company?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+                {publicDeals.filter(d => d.title?.toLowerCase().includes(searchQuery.toLowerCase()) || d.company?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 rounded-2xl border border-dashed border-slate-800 text-center bg-slate-900/5 py-16">
-                <p className="text-2xl mb-2">🎉</p>
+                <Confetti className="w-12 h-12 text-teal-400 mb-2" />
                 <p className="text-sm font-semibold text-slate-400">Le marché est vide !</p>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">Tous les leads ont été assignés ou récupérés. L'administration injectera bientôt de nouvelles opportunités.</p>
               </div>
@@ -782,10 +790,10 @@ export default function CommercialDashboard({ onLogout }) {
 
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Contact principal :</p>
-                          <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800/40 text-xs space-y-1 text-slate-700 dark:text-slate-300 font-mono">
-                            <div>👤 {deal.contact ? `${deal.contact.firstName} ${deal.contact.lastName}` : 'Inconnu'}</div>
-                            {deal.contact?.phone && <div>📞 {deal.contact.phone}</div>}
-                            {deal.contact?.email && <div className="truncate">✉️ {deal.contact.email}</div>}
+                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800/40 text-xs space-y-1 text-slate-700 dark:text-slate-300 font-mono">
+                            <div><User className="inline-block w-4 h-4 mr-2" />{deal.contact ? `${deal.contact.firstName} ${deal.contact.lastName}` : 'Inconnu'}</div>
+                            {deal.contact?.phone && <div><Phone className="inline-block w-4 h-4 mr-2" />{deal.contact.phone}</div>}
+                            {deal.contact?.email && <div className="truncate"><Mail className="inline-block w-4 h-4 mr-2" />{deal.contact.email}</div>}
                           </div>
                         </div>
                       </div>
@@ -795,7 +803,7 @@ export default function CommercialDashboard({ onLogout }) {
                           onClick={() => handleClaimDeal(deal._id)}
                           className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/10 hover:opacity-95 active:scale-[0.98] transition-all"
                         >
-                          📥 Récupérer ce lead
+                          <Inbox className="inline-block w-4 h-4 mr-2" />Récupérer ce lead
                         </button>
                       </div>
                     </div>
@@ -815,14 +823,14 @@ export default function CommercialDashboard({ onLogout }) {
             <div className="flex justify-between items-center border-b border-slate-800 pb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-                  <span className="text-teal-400 text-sm">＋</span>
+                  <Plus className="w-5 h-5 text-teal-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white leading-none">Nouveau Prospect</h3>
                   <p className="text-[10px] text-slate-500 mt-0.5">Renseignez les informations de contact</p>
                 </div>
               </div>
-              <button onClick={() => setShowContactModal(false)} className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors text-sm">✕</button>
+              <button onClick={() => setShowContactModal(false)} className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors text-sm"><X className="w-4 h-4" /></button>
             </div>
             
             <form onSubmit={handleCreateContact} className="space-y-4">
@@ -927,7 +935,7 @@ export default function CommercialDashboard({ onLogout }) {
           <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white">Créer une opportunité (Deal)</h3>
-              <button onClick={() => setShowDealModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setShowDealModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
             
             <form onSubmit={handleCreateDeal} className="space-y-4">
@@ -1014,7 +1022,7 @@ export default function CommercialDashboard({ onLogout }) {
           <form onSubmit={handleUpdateProfile} className="w-full max-w-sm rounded-2xl border border-slate-700/60 bg-slate-900 p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white">Mon Profil</h3>
-              <button type="button" onClick={() => setShowProfileModal(false)} className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+              <button type="button" onClick={() => setShowProfileModal(false)} className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"><X className="w-4 h-4" /></button>
             </div>
             
             <div className="flex flex-col items-center space-y-2 py-2">

@@ -12,20 +12,45 @@ import PWAInstallBanner from './components/PWAInstallBanner';
 // ID Client Google Cloud réel
 const GOOGLE_CLIENT_ID = '888553843615-o50pub4r34o8tssooskbsgr18rkcfq6q.apps.googleusercontent.com';
 
-// === GESTIONNAIRE DE SÉCURITÉ : VÉRIFICATION DU TOKEN ET DU RÔLE ===
+// === GESTIONNAIRE DE SÉCURITÉ : VÉRIFICATION DU TOKEN ET DU RÔLE (VIA BACKEND) ===
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const token = localStorage.getItem('token');
-  const userRole = localStorage.getItem('userRole');
+  const [checking, setChecking] = React.useState(true);
+  const [roleOk, setRoleOk] = React.useState(false);
 
-  // 1. Si aucun token → retour immédiat au Login
-  if (!token) {
-    return <Navigate to="/" replace />;
+  React.useEffect(() => {
+    const API_AUTH_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/auth` : 'http://localhost:5001/api/auth';
+
+    // Call profile endpoint with credentials so httpOnly cookies are sent
+    fetch(`${API_AUTH_URL}/profile`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then(data => {
+        const serverRole = data.user?.role || localStorage.getItem('userRole');
+        localStorage.setItem('userRole', serverRole);
+        if (allowedRole && serverRole !== allowedRole) {
+          setRoleOk(false);
+        } else {
+          setRoleOk(true);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('user');
+        localStorage.removeItem('userRole');
+        setRoleOk(false);
+      })
+      .finally(() => setChecking(false));
+  }, [allowedRole]);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl border-2 border-t-emerald-400 border-slate-800 animate-spin"></div>
+      </div>
+    );
   }
 
-  // 2. Si un rôle spécifique est requis et que l'utilisateur ne l'a pas
-  if (allowedRole && userRole !== allowedRole) {
-    // Redirection automatique selon ses privilèges réels
-    return <Navigate to={userRole === 'admin' ? '/admin' : '/dashboard'} replace />;
+  if (!roleOk) {
+    const userRole = localStorage.getItem('userRole');
+    return <Navigate to={userRole === 'admin' ? '/admin' : '/'} replace />;
   }
 
   return children;

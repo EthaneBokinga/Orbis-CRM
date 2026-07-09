@@ -55,6 +55,7 @@ exports.login = async (req, res) => {
     user.refreshTokenHash = await bcrypt.hash(refreshToken, salt);
     await user.save();
 
+    // Set refresh token cookie (httpOnly) and short-lived access token cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -62,8 +63,14 @@ exports.login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 15 * 60 * 1000
+    });
+
     res.json({
-      accessToken,
       user: { id: user._id, name: user.name, email: user.email, role: user.role }
     });
   } catch (err) {
@@ -124,8 +131,14 @@ exports.googleLogin = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 15 * 60 * 1000
+    });
+
     res.json({
-      accessToken,
       user: { id: user._id, name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl }
     });
   } catch (err) {
@@ -161,8 +174,14 @@ exports.refresh = async (req, res) => {
       sameSite: 'Strict',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
+    res.cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 15 * 60 * 1000
+    });
 
-    res.json({ accessToken: newAccessToken });
+    res.json({ message: 'Token rafraîchi.' });
   } catch (err) {
     return res.status(403).json({ error: 'Session expirée.' });
   }
@@ -211,6 +230,26 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Erreur lors de la mise à jour du profil." });
+  }
+};
+
+// Retourne le profil utilisateur courant (vérifie le token via middleware requireAuth)
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur interne du serveur.' });
   }
 };
 

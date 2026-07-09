@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Eye, EyeOff, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, ShieldAlert, ShieldCheck, Check, X } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 
@@ -44,14 +44,14 @@ export default function AuthPage({ onLoginSuccess }) {
   const [showForgotModal, setShowForgotModal] = useState(false);
 
   const emailValid = EMAIL_REGEX.test(formData.email);
-  const emailHint = formData.email.length === 0 ? null : emailValid ? '✅' : '❌';
+  const emailHint = formData.email.length === 0 ? null : emailValid ? 'ok' : 'bad';
   const { count, percent } = getStrength(formData.password);
   const strengthCfg = STRENGTH_CONFIG[percent] || STRENGTH_CONFIG[0];
   const isStrong = percent === 100;
 
   const blockClipboard = (e) => {
     e.preventDefault();
-    showToast('⚠️ Copier / Coller désactivé sur ce champ pour votre sécurité.', 'warning');
+    showToast('Copier / Coller désactivé sur ce champ pour votre sécurité.', 'warning');
   };
 
   const handleSubmit = async (e) => {
@@ -86,6 +86,7 @@ export default function AuthPage({ onLoginSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -95,7 +96,7 @@ export default function AuthPage({ onLoginSuccess }) {
       }
 
       if (isLogin) {
-        localStorage.setItem('token', data.accessToken);
+        // Access token now set as httpOnly cookie by the server. Store minimal user info locally for UI.
         localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('userRole', data.user.role);
         showToast('Connexion réussie !', 'success');
@@ -121,6 +122,7 @@ export default function AuthPage({ onLoginSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: credentialResponse.credential }),
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -129,7 +131,7 @@ export default function AuthPage({ onLoginSuccess }) {
         throw new Error(data.error || "Échec de l'authentification Google.");
       }
 
-      localStorage.setItem('token', data.accessToken);
+      // Server sets access token as httpOnly cookie. Store minimal user info.
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('userRole', data.user.role);
       showToast('Connexion Google réussie !', 'success');
@@ -203,7 +205,7 @@ export default function AuthPage({ onLoginSuccess }) {
               />
               {emailHint && (
                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm">
-                  {emailHint}
+                  {emailHint === 'ok' ? <Check className="text-emerald-400" /> : <X className="text-rose-400" />}
                 </span>
               )}
             </div>

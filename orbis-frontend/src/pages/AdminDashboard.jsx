@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
 import { useToast } from '../components/UI/Toast';
+import { Plus, Rocket, AlertTriangle, User, Unlock, UserX, Key, X, RefreshCw } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/crm/admin` 
@@ -362,7 +363,7 @@ export default function AdminDashboard() {
   if (error) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 text-2xl mb-4">⚠️</div>
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 text-2xl mb-4"><AlertTriangle className="w-8 h-8" /></div>
         <h3 className="text-xl font-bold text-white">Échec d'authentification de sécurité</h3>
         <p className="text-sm text-slate-400 max-w-sm mt-2">{error}</p>
         <p className="text-xs text-slate-500 max-w-xs mt-1">Assurez-vous d'avoir les droits de direction requis pour accéder au QG Admin.</p>
@@ -423,13 +424,15 @@ export default function AdminDashboard() {
               onClick={() => setShowUserModal(true)}
               className="px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2"
             >
-              ➕ Intégrer un Agent
+              <Plus className="w-4 h-4" />
+              Intégrer un Agent
             </button>
             <button 
               onClick={() => setShowDealModal(true)}
               className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:opacity-90 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/10 transition-all flex items-center gap-2"
             >
-              🚀 Injecter un Marché
+              <Rocket className="w-4 h-4" />
+              Injecter un Marché
             </button>
           </div>
         </div>
@@ -526,7 +529,7 @@ export default function AdminDashboard() {
                               : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
                           }`}
                         >
-                          {c.isActive ? '🚫' : '🔑'}
+                          {c.isActive ? <UserX className="w-4 h-4" /> : <Key className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
@@ -597,7 +600,7 @@ export default function AdminDashboard() {
                           <span className={`inline-flex items-center px-2.5 py-1 border rounded-md text-xs ${
                             d.assignedTo ? 'text-slate-400 bg-slate-950 border-slate-800' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
                           }`}>
-                            {d.assignedTo ? `👤 ${d.assignedTo?.name}` : '🔓 Public (non assigné)'}
+                            {d.assignedTo ? <span className="inline-flex items-center gap-2"><User className="w-4 h-4" />{d.assignedTo?.name}</span> : <span className="inline-flex items-center gap-2"><Unlock className="w-4 h-4" />Public (non assigné)</span>}
                           </span>
                         </td>
                         <td className="p-3.5 text-right">
@@ -709,7 +712,7 @@ export default function AdminDashboard() {
           <form onSubmit={handleCreateDeal} className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white">Injecter un Nouveau Marché</h3>
-              <button type="button" onClick={() => setShowDealModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button type="button" onClick={() => setShowDealModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
             
             <div className="space-y-3">
@@ -777,7 +780,7 @@ export default function AdminDashboard() {
           <form onSubmit={handleCreateUser} className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white">Créer un Agent / Commercial</h3>
-              <button type="button" onClick={() => setShowUserModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button type="button" onClick={() => setShowUserModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
             
             <div className="space-y-3">
@@ -847,7 +850,7 @@ export default function AdminDashboard() {
           <form onSubmit={handleUpdateProfile} className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white">Mon Profil Direction</h3>
-              <button type="button" onClick={() => setShowProfileModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button type="button" onClick={() => setShowProfileModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
             
             <div className="flex flex-col items-center space-y-3 py-2">
@@ -939,13 +942,14 @@ export default function AdminDashboard() {
 
         {/* — Journal d’Audit — */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 space-y-4">
-          <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
               Journal d'Audit
             </h3>
-            <button onClick={fetchAuditLogs} className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg border border-slate-800 hover:border-slate-700">
-              ⟳ Actualiser
+            <button onClick={fetchAuditLogs} className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg border border-slate-800 hover:border-slate-700 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Actualiser
             </button>
           </div>
 
@@ -985,7 +989,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
           <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-5">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg flex-shrink-0">⚠️</div>
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg flex-shrink-0"><AlertTriangle className="w-6 h-6" /></div>
               <div>
                 <h4 className="text-sm font-bold text-white mb-1">Confirmation requise</h4>
                 <p className="text-xs text-slate-400 leading-relaxed">{confirmModal.message}</p>

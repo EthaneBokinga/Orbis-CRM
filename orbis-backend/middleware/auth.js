@@ -1,12 +1,19 @@
 const jwt = require('jsonwebtoken');
 
 const requireAuth = (req, res, next) => {
+  // Support Authorization header or httpOnly cookie 'accessToken'
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.cookies && req.cookies.accessToken) {
+    token = req.cookies.accessToken;
+  }
+
+  if (!token) {
     return res.status(401).json({ error: 'Accès non autorisé. Token absent.' });
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
     req.user = decoded;

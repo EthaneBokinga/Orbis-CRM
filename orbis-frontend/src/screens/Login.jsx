@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
-import { Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ShieldCheck, Check, X } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
 
 // ─── Directive §1 : Regex email stricte ───
@@ -16,12 +16,12 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
 
   // ─── Directive §1 : Indicateur en temps réel de l'email ───
   const emailValid = EMAIL_REGEX.test(email);
-  const emailHint  = email.length === 0 ? null : emailValid ? '✅' : '❌';
+  const emailHint  = email.length === 0 ? null : emailValid ? 'ok' : 'bad';
 
   // ─── Directive §1 : Blocage presse-papier sur le mot de passe ───
   const blockClipboard = (e) => {
     e.preventDefault();
-    showToast('⚠️ Copier / Coller désactivé sur ce champ pour votre sécurité.', 'warning');
+    showToast('Copier / Coller désactivé sur ce champ pour votre sécurité.', 'warning');
   };
 
   const handleSubmit = async (e) => {
@@ -94,7 +94,7 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
               {/* Indicateur email temps réel */}
               {emailHint && (
                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm">
-                  {emailHint}
+                  {emailHint === 'ok' ? <Check className="text-emerald-400" /> : <X className="text-rose-400" />}
                 </span>
               )}
             </div>
