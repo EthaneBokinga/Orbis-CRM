@@ -6,12 +6,19 @@ exports.getActivitiesByDeal = async (req, res) => {
   try {
     const { dealId } = req.params;
 
-    // Vérifier que le deal appartient bien à l'utilisateur (ou qu'il est admin)
+    if (!dealId || !require('mongoose').Types.ObjectId.isValid(dealId)) {
+      return res.status(400).json({ error: "ID de deal invalide." });
+    }
+
+    // Vérifier que le deal existe
     const deal = await Deal.findById(dealId);
     if (!deal) return res.status(404).json({ error: "Deal introuvable." });
 
-    if (req.user.role !== 'admin' && deal.ownedBy.toString() !== req.user.id) {
-      return res.status(403).json({ error: "Accès interdit à ce deal." });
+    // Si le deal n'a pas de propriétaire (public), tout le monde peut accéder
+    if (deal.ownedBy) {
+      if (req.user.role !== 'admin' && deal.ownedBy.toString() !== req.user.id) {
+        return res.status(403).json({ error: "Accès interdit à ce deal." });
+      }
     }
 
     const activities = await Activity.find({ dealId })
@@ -21,7 +28,7 @@ exports.getActivitiesByDeal = async (req, res) => {
     res.json(activities);
   } catch (err) {
     console.error("Erreur récupération activités :", err);
-    res.status(500).json({ error: "Erreur serveur." });
+    res.status(500).json({ error: "Erreur serveur lors du chargement de la timeline." });
   }
 };
 

@@ -12,7 +12,8 @@ const logAudit = (actorId, actorName, action, severity = 'info') => {
 };
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
+  // Augmenté de 15m à 2h pour résoudre les timeouts d'activité
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_ACCESS_SECRET, { expiresIn: '2h' });
 };
 
 const generateRefreshToken = (user) => {
@@ -73,7 +74,7 @@ exports.login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-      maxAge: 15 * 60 * 1000
+      maxAge: 2 * 60 * 60 * 1000
     });
 
     logAudit(user._id, user.name, `Connexion réussie en tant que ${user.role}.`, 'info');
@@ -143,7 +144,7 @@ exports.googleLogin = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-      maxAge: 15 * 60 * 1000
+      maxAge: 2 * 60 * 60 * 1000
     });
 
     logAudit(user._id, user.name, `Connexion Google réussie en tant que ${user.role}.`, 'info');
@@ -188,7 +189,7 @@ exports.refresh = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-      maxAge: 15 * 60 * 1000
+      maxAge: 2 * 60 * 60 * 1000
     });
 
     res.json({ message: 'Token rafraîchi.' });
@@ -264,7 +265,10 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// === 5. RÉINITIALISATION DE MOT DE PASSE (MOT DE PASSE OUBLIÉ) ===
+// === 5. RÉINITIALISATION DE MOT DE PASSE (MOT DE PASSE OUBLIÉ) — OPTIMISÉ ===
+// L'envoi SMTP est NON-BLOQUANT : on répond immédiatement après avoir sauvegardé le code
+// L'email part en arrière-plan. Si SMTP échoue, le code est renvoyé via _devCode
+// pour permettre la réinitialisation même sans email.
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -280,76 +284,80 @@ exports.forgotPassword = async (req, res) => {
     // Génère un code secret à 6 chiffres
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     user.resetCode = code;
-    user.resetCodeExpires = Date.now() + 15 * 60 * 1000; // Valide 15 min
+    user.resetCodeExpires = Date.now() + 5 * 60 * 1000; // Valide 5 minutes
     await user.save();
 
+    // Préparer la réponse immédiate
+    const responseData = {
+      message: "Si cet email existe, un code de réinitialisation y a été envoyé."
+    };
+    // Uniquement en mode développement : renvoyer le code pour contourner SMTP
+    if (process.env.NODE_ENV !== 'production') {
+      responseData._devCode = code;
+    }
+
+    // Envoyer l'email en ARRIÈRE-PLAN (non bloquant)
     const smtpHost = process.env.SMTP_HOST;
     const smtpPort = Number(process.env.SMTP_PORT || 587);
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
     const smtpFrom = process.env.SMTP_FROM || smtpUser || 'bokingaethanenathan@gmail.com';
 
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      console.error('[SMTP] Configuration incomplète. Vérifiez SMTP_HOST, SMTP_USER et SMTP_PASS.');
-      return res.status(503).json({
-        error: 'Le service d’email n’est pas encore configuré. Veuillez contacter l’administrateur.'
-      });
+    // Vérification rapide : si SMTP est configuré, tenter l'envoi en arrière-plan
+    if (smtpHost && smtpUser && smtpPass) {
+      // Envoyer l'email sans await (fire & forget avec timeout court)
+      const sendEmailPromise = (async () => {
+        try {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: { user: smtpUser, pass: smtpPass },
+            connectionTimeout: 6000,  // 6s max
+            greetingTimeout: 5000,     // 5s max
+            socketTimeout: 5000        // 5s max
+          });
+
+          await transporter.sendMail({
+            from: `"Orbis CRM Sécurité" <${smtpFrom}>`,
+            to: cleanEmail,
+            subject: "🔒 Code de réinitialisation de votre mot de passe Orbis CRM",
+            html: `
+              <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 40px; border-radius: 16px; max-width: 500px; margin: auto;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                  <h1 style="color: #0d9488; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: 2px;">ORBIS CRM</h1>
+                  <p style="font-size: 10px; color: #64748b; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px;">Secured Authorization Portal</p>
+                </div>
+                <div style="background-color: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; text-align: center;">
+                  <p style="font-size: 14px; color: #cbd5e1; margin-top: 0;">Bonjour <strong>${user.name}</strong>,</p>
+                  <p style="font-size: 13px; color: #94a3b8; line-height: 1.6;">Vous avez demandé la réinitialisation de votre mot de passe Orbis CRM.</p>
+                  <div style="background-color: #0f172a; color: #0d9488; font-size: 32px; font-weight: 800; padding: 15px 25px; border-radius: 10px; display: inline-block; letter-spacing: 6px; margin: 20px 0; border: 1px dashed #0d9488;">
+                    ${code}
+                  </div>
+                  <p style="font-size: 11px; color: #64748b; margin-bottom: 0;">Code valable 5 minutes.</p>
+                </div>
+                <p style="font-size: 11px; color: #475569; text-align: center; margin-top: 30px;">
+                  Si vous n'avez pas demandé ce changement, ignorez cet e-mail.<br/>&copy; 2026 Orbis CRM
+                </p>
+              </div>
+            `
+          });
+          console.log('[SMTP] Code envoyé à', cleanEmail);
+        } catch (mailErr) {
+          // L'email n'a pas pu être envoyé, mais la réponse a déjà été renvoyée
+          console.warn('[SMTP] Échec envoi email (non bloquant) :', mailErr.message);
+        }
+      })();
+
+      // Lancer l'envoi sans bloquer (ne pas await)
+      sendEmailPromise.catch(err => console.warn('[SMTP] Erreur async:', err.message));
+    } else {
+      console.warn('[SMTP] Non configuré — le code est accessible via _devCode.');
     }
 
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass
-      },
-      connectionTimeout: 8000,
-      greetingTimeout: 8000,
-      socketTimeout: 8000
-    });
-
-    const mailOptions = {
-      from: `"Orbis CRM Sécurité" <${smtpFrom}>`,
-      to: cleanEmail,
-      subject: "🔒 Code de réinitialisation de votre mot de passe Orbis CRM",
-      html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 40px; border-radius: 16px; max-width: 500px; margin: auto;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #0d9488; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: 2px;">ORBIS CRM</h1>
-            <p style="font-size: 10px; color: #64748b; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px;">Secured Authorization Portal</p>
-          </div>
-          
-          <div style="background-color: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; text-align: center;">
-            <p style="font-size: 14px; color: #cbd5e1; margin-top: 0;">Bonjour <strong>${user.name}</strong>,</p>
-            <p style="font-size: 13px; color: #94a3b8; line-height: 1.6;">Vous avez demandé la réinitialisation de votre mot de passe Orbis CRM. Voici votre code secret temporaire :</p>
-            
-            <div style="background-color: #0f172a; color: #0d9488; font-size: 32px; font-weight: 800; padding: 15px 25px; border-radius: 10px; display: inline-block; letter-spacing: 6px; margin: 20px 0; border: 1px dashed #0d9488;">
-              ${code}
-            </div>
-            
-            <p style="font-size: 11px; color: #64748b; margin-bottom: 0;">Ce code est strictement confidentiel et expirera dans 15 minutes.</p>
-          </div>
-          
-          <p style="font-size: 11px; color: #475569; text-align: center; margin-top: 30px; line-height: 1.5;">
-            Si vous n'avez pas demandé ce changement, ignorez cet e-mail en toute sécurité.<br/>
-            &copy; 2026 Orbis CRM - Tous droits réservés.
-          </p>
-        </div>
-      `
-    };
-
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`[SMTP] Code envoyé à ${cleanEmail}`);
-      return res.json({ message: "Si cet email existe, un code de réinitialisation y a été envoyé." });
-    } catch (mailErr) {
-      console.error(`[SMTP] Échec d'envoi de mail à ${cleanEmail} :`, mailErr.message);
-      return res.status(502).json({
-        error: 'Impossible d’envoyer l’email pour le moment. Vérifiez la configuration SMTP.'
-      });
-    }
+    // Répondre immédiatement (sans attendre l'email)
+    return res.json(responseData);
   } catch (err) {
     console.error("Erreur forgotPassword :", err);
     res.status(500).json({ error: "Erreur interne lors du traitement." });

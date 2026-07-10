@@ -32,7 +32,12 @@ router.put('/deals/:id/stage', crmController.updateDealStage);
 // Route Dashboard Analytique
 router.get('/dashboard/stats', crmController.getDashboardStats);
 
-// Routes Administration (Supervision)
+// Progression des objectifs (accessible à tous les utilisateurs authentifiés)
+const adminController = require('../controllers/adminController');
+router.get('/goals/progress', adminController.getGoalsProgress);
+router.get('/goals/history', adminController.getGoalHistory);
+
+// Routes Administration (Supervision) — nécessite le rôle admin
 const adminRoutes = require('./adminRoutes');
 router.use('/admin', adminRoutes);
 

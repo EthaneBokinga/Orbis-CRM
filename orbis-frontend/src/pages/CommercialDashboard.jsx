@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/UI/Toast';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationBadge from '../components/NotificationBadge';
+import ChatPanel from '../components/ChatPanel';
 import ActivityTimeline from '../components/ActivityTimeline';
-import { X, User, Phone, Mail, Inbox, Clipboard, Clock, ChevronRight, ChevronLeft, RefreshCw, Plus } from 'lucide-react';
+import { X, User, Phone, Mail, Inbox, Clipboard, Clock, ChevronRight, ChevronLeft, RefreshCw, Plus, BarChart3, TrendingUp, TrendingDown, LayoutDashboard, Users, KanbanSquare, Store, MessageSquare, Goal, Bell, Calendar, DollarSign, FileText, Search } from 'lucide-react';
+import CalendarPanel from '../components/CalendarPanel';
+import InvoicePanel from '../components/InvoicePanel';
+import GlobalSearch from '../components/GlobalSearch';
 
 const API_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/crm` 
@@ -83,6 +88,9 @@ export default function CommercialDashboard({ onLogout }) {
   const [interactions, setInteractions] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // --- Menu mobile ---
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // --- États Sélections / Modals ---
   const [selectedContact, setSelectedContact] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +106,42 @@ export default function CommercialDashboard({ onLogout }) {
 
   // --- Marché aux Leads (Deals Publics) ---
   const [publicDeals, setPublicDeals] = useState([]);
+  
+  // --- Chat ---
+  const [chatOpen, setChatOpen] = useState(false);
+  
+  // --- Recherche Globale ---
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Ctrl+K pour ouvrir la recherche
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // --- Calendrier ---
+  const [showCalendar, setShowCalendar] = useState(false);
+  
+  // --- Factures ---
+  const [showInvoices, setShowInvoices] = useState(false);
+
+  // --- Objectifs & Progression ---
+  const [goalsProgress, setGoalsProgress] = useState({
+    monthly: { goal: 0, current: 0, percentage: 0 },
+    yearly: { goal: 0, current: 0, percentage: 0 },
+    weekly: { goal: 0, current: 0, percentage: 0 }
+  });
+  const [goalHistory, setGoalHistory] = useState([]);
+  const [showGoalHistory, setShowGoalHistory] = useState(false);
+  const [reminders, setReminders] = useState([]);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [newReminder, setNewReminder] = useState({ type: 'appel', title: '', description: '', remindAt: '', remindBeforeMinutes: 30 });
 
   // Récupération du token d'authentification
   const getAuthHeader = (isJson = true) => {
@@ -105,6 +149,62 @@ export default function CommercialDashboard({ onLogout }) {
       credentials: 'include',
       headers: isJson ? { 'Content-Type': 'application/json' } : undefined
     };
+  };
+
+  // === CHARGEMENT DE LA PROGRESSION DES OBJECTIFS ===
+  const fetchGoalsProgress = async () => {
+    try {
+      const res = await fetch(`${API_URL}/goals/progress`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setGoalsProgress(data);
+      }
+    } catch {}
+  };
+
+  // === CHARGEMENT DE L'HISTORIQUE DES OBJECTIFS ===
+  const fetchGoalHistory = async () => {
+    try {
+      const res = await fetch(`${API_URL}/goals/history`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setGoalHistory(data);
+      }
+    } catch {}
+  };
+
+  // === CHARGEMENT DES RAPPELS ===
+  const fetchReminders = async () => {
+    try {
+      const res = await fetch(`${API_URL.replace('/crm', '')}/reminders?upcoming=true`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setReminders(data);
+      }
+    } catch {}
+  };
+
+  // === CRÉER UN RAPPEL ===
+  const handleCreateReminder = async (e) => {
+    e.preventDefault();
+    if (!newReminder.title || !newReminder.remindAt) {
+      showToast("Titre et date requis.", "warning");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL.replace('/crm', '')}/reminders`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newReminder)
+      });
+      if (res.ok) {
+        showToast("Rappel créé avec succès !", "success");
+        setShowReminderModal(false);
+        setNewReminder({ type: 'appel', title: '', description: '', remindAt: '', remindBeforeMinutes: 30 });
+        fetchReminders();
+      }
+    } catch { showToast("Erreur réseau.", "error"); }
   };
 
   // === CHARGEMENT DES DONNÉES DEPUIS LE BACKEND ===
@@ -162,6 +262,7 @@ export default function CommercialDashboard({ onLogout }) {
   useEffect(() => {
     fetchData();
     fetchPublicDeals();
+    fetchGoalsProgress();
   }, []);
 
   // === CHARGEMENT DES ÉCHANGES QUAND ON CLIQUE SUR UN CONTACT ===
@@ -315,12 +416,13 @@ export default function CommercialDashboard({ onLogout }) {
       
       {/* ================= BARRE DE NAVIGATION PREMIUM ================= */}
       <nav className="sticky top-0 z-40 border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => { setActiveTab('dashboard'); setSelectedContact(null); }}>
-            <img src="/outpout/wordmark/wordmark-transparent.png" alt="Orbis CRM" className="h-8 object-contain transform group-hover:scale-102 transition-transform duration-200" />
+            <img src="/outpout/wordmark/wordmark-transparent.png" alt="Orbis CRM" className="h-7 md:h-8 object-contain transform group-hover:scale-102 transition-transform duration-200" />
           </div>
           
-          <div className="flex items-center space-x-1 bg-slate-900/60 border border-slate-800/80 p-1 rounded-xl">
+          {/* Navigation desktop: tabs visibles */}
+          <div className="hidden md:flex items-center space-x-1 bg-slate-900/60 border border-slate-800/80 p-1 rounded-xl">
             <button 
               onClick={() => { setActiveTab('dashboard'); setSelectedContact(null); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-semibold shadow-md' : 'text-slate-400 hover:text-white'}`}
@@ -331,23 +433,56 @@ export default function CommercialDashboard({ onLogout }) {
               onClick={() => { setActiveTab('contacts'); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${activeTab === 'contacts' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-semibold shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
-              Portefeuille Clients
+              Clients
             </button>
             <button 
               onClick={() => { setActiveTab('kanban'); setSelectedContact(null); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${activeTab === 'kanban' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-semibold shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
-              Pipeline Kanban
+              Kanban
             </button>
             <button 
               onClick={() => { setActiveTab('marketplace'); setSelectedContact(null); fetchPublicDeals(); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${activeTab === 'marketplace' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-semibold shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
-              Marché aux Leads
+              Marché
             </button>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="hidden md:flex items-center space-x-3">
+            {/* Bouton Recherche */}
+            <button
+              onClick={() => setShowSearch(true)}
+              className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all"
+              title="Recherche globale (Ctrl+K)"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            {/* Bouton Messagerie */}
+            <button
+              onClick={() => setChatOpen(true)}
+              className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all"
+              title="Messagerie"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+            {/* Bouton Factures */}
+            <button
+              onClick={() => setShowInvoices(true)}
+              className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all"
+              title="Factures & Devis"
+            >
+              <DollarSign className="w-4 h-4" />
+            </button>
+            {/* Bouton Calendrier */}
+            <button
+              onClick={() => setShowCalendar(true)}
+              className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all"
+              title="Calendrier"
+            >
+              <Calendar className="w-4 h-4" />
+            </button>
+            <NotificationBadge />
             <ThemeToggle className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all duration-200 text-xs font-semibold" />
 
             <div 
@@ -361,7 +496,7 @@ export default function CommercialDashboard({ onLogout }) {
                   {currentUser.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <div className="hidden md:flex flex-col text-left">
+              <div className="flex flex-col text-left">
                 <span className="text-xs font-semibold text-slate-200 leading-none">{currentUser.name}</span>
                 <span className="text-[9px] text-teal-400 font-mono capitalize leading-none mt-1">{currentUser.role}</span>
               </div>
@@ -374,7 +509,101 @@ export default function CommercialDashboard({ onLogout }) {
               Déconnexion
             </button>
           </div>
+
+          {/* Version mobile: icônes + hamburger */}
+          <div className="flex md:hidden items-center gap-2">
+            <NotificationBadge />
+            <ThemeToggle className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all duration-200 text-xs" />
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-all"
+              aria-label="Menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {mobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Menu mobile déroulant */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-800/60 bg-slate-950/95 backdrop-blur-md px-4 py-4 space-y-2 animate-fadeIn">
+            <div 
+              onClick={() => { setProfileName(currentUser.name); setProfileAvatar(currentUser.avatarUrl || ''); setShowProfileModal(true); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 cursor-pointer hover:bg-slate-800/40 transition-colors mb-3"
+            >
+              {currentUser.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt="Avatar" className="w-9 h-9 rounded-full object-cover border border-teal-500/30" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-sm font-black text-slate-950">
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-slate-200">{currentUser.name}</p>
+                <p className="text-[10px] text-teal-400 font-mono capitalize">{currentUser.role}</p>
+              </div>
+            </div>
+
+            {/* Messagerie mobile */}
+            <button
+              onClick={() => { setChatOpen(true); setMobileMenuOpen(false); }}
+              className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Messagerie
+            </button>
+
+            {[
+              { key: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard },
+              { key: 'contacts', label: 'Portefeuille Clients', icon: Users },
+              { key: 'kanban', label: 'Pipeline Kanban', icon: KanbanSquare },
+              { key: 'marketplace', label: 'Marché aux Leads', icon: Store }
+            ].map(item => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => { setActiveTab(item.key); setSelectedContact(null); setMobileMenuOpen(false); if (item.key === 'marketplace') fetchPublicDeals(); }}
+                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                    activeTab === item.key
+                      ? 'bg-gradient-to-r from-teal-500/20 to-emerald-500/20 text-teal-400 border border-teal-500/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+
+            <div className="pt-3 border-t border-slate-800/60 mt-2">
+              <button
+                onClick={() => { setShowDealModal(true); setMobileMenuOpen(false); }}
+                className="w-full py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 rounded-xl text-xs font-bold mb-2"
+              >
+                + Nouvelle Opportunité
+              </button>
+              <button
+                onClick={() => { setShowContactModal(true); setMobileMenuOpen(false); }}
+                className="w-full py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 mb-2"
+              >
+                + Nouveau Contact
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold hover:bg-rose-500/20 transition-all"
+              >
+                Déconnexion
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ================= CONTENU PRINCIPAL ================= */}
@@ -402,7 +631,14 @@ export default function CommercialDashboard({ onLogout }) {
                 <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 font-mono tracking-tight">
                   {wonDealsCount} <span className="text-lg text-teal-600 dark:text-emerald-400 font-sans font-normal">Signé(s)</span>
                 </p>
-                <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">Objectif mensuel en cours de validation</div>
+                <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                  {goalsProgress.monthly.goal > 0 ? (
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Objectif mensuel : {Math.min(goalsProgress.monthly.percentage, 100)}% atteint
+                    </span>
+                  ) : 'Objectif mensuel en cours de validation'}
+                </div>
               </div>
 
               <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm dark:shadow-xl group hover:border-slate-350 dark:hover:border-slate-700/60 transition-all duration-300">
@@ -417,6 +653,85 @@ export default function CommercialDashboard({ onLogout }) {
                 </div>
               </div>
             </div>
+
+            {/* Barre de progression des objectifs */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { key: 'weekly', label: 'Hebdo', data: goalsProgress.weekly, color: 'text-blue-400' },
+                { key: 'monthly', label: 'Mensuel', data: goalsProgress.monthly, color: 'text-emerald-400' },
+                { key: 'yearly', label: 'Annuel', data: goalsProgress.yearly, color: 'text-amber-400' }
+              ].map(p => {
+                const percent = p.data.percentage || 0;
+                const barColor = percent >= 100 ? 'bg-emerald-500' : percent >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+                return (
+                  <div key={p.key} className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${p.color}`}>{p.label}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{p.data.goal.toLocaleString('fr-FR')} F</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-1.5">
+                      <div className={`h-full ${barColor} rounded-full transition-all duration-1000`} style={{ width: `${Math.min(percent, 100)}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-slate-400 font-mono">{p.data.current.toLocaleString('fr-FR')} F</span>
+                      <span className={`font-bold font-mono ${p.color}`}>{percent}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bouton historique des objectifs */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setShowGoalHistory(!showGoalHistory); if (!showGoalHistory) fetchGoalHistory(); }}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] text-slate-400 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                <BarChart3 className="w-3 h-3" />
+                {showGoalHistory ? 'Masquer l\'historique' : 'Voir l\'historique des objectifs'}
+              </button>
+              <button
+                onClick={() => setShowReminderModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 hover:text-emerald-300 transition-all flex items-center gap-1.5"
+              >
+                <Calendar className="w-3 h-3" />
+                Ajouter un Rappel
+              </button>
+            </div>
+
+            {/* Historique des objectifs */}
+            {showGoalHistory && goalHistory.length > 0 && (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/20 p-4 animate-fadeIn">
+                <h4 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  Historique des Objectifs
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-[10px]">
+                    <thead>
+                      <tr className="bg-slate-950 border-b border-slate-800 text-slate-500 font-semibold uppercase">
+                        <th className="p-2">Date</th>
+                        <th className="p-2">Période</th>
+                        <th className="p-2">Ancien</th>
+                        <th className="p-2">Nouveau</th>
+                        <th className="p-2">Par</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/40">
+                      {goalHistory.slice(0, 5).map(h => (
+                        <tr key={h._id} className="hover:bg-slate-900/40">
+                          <td className="p-2 font-mono text-slate-400">{new Date(h.createdAt).toLocaleDateString('fr-FR')}</td>
+                          <td className="p-2 capitalize text-slate-300">{h.period}</td>
+                          <td className="p-2 font-mono text-slate-600">{h.oldGoal.toLocaleString('fr-FR')} F</td>
+                          <td className="p-2 font-mono text-emerald-400 font-bold">{h.newGoal.toLocaleString('fr-FR')} F</td>
+                          <td className="p-2 text-slate-400">{h.changedByName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Graphique de Pipeline Custom */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1074,6 +1389,96 @@ export default function CommercialDashboard({ onLogout }) {
             </div>
           </form>
         </div>
+      )}
+
+      {/* ================= MODAL RAPPEL ================= */}
+      {showReminderModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <form onSubmit={handleCreateReminder} className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Bell className="w-4 h-4 text-teal-400" />
+                Nouveau Rappel
+              </h3>
+              <button type="button" onClick={() => setShowReminderModal(false)} className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <select
+                value={newReminder.type}
+                onChange={(e) => setNewReminder({ ...newReminder, type: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+              >
+                <option value="appel">📞 Appel</option>
+                <option value="rdv">📅 Rendez-vous</option>
+                <option value="email">✉️ Email</option>
+                <option value="relance">🔄 Relance</option>
+                <option value="tache">✅ Tâche</option>
+              </select>
+              <input
+                type="text" required
+                placeholder="Titre du rappel *"
+                value={newReminder.title}
+                onChange={(e) => setNewReminder({ ...newReminder, title: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500"
+              />
+              <textarea
+                placeholder="Description (optionnelle)"
+                value={newReminder.description}
+                onChange={(e) => setNewReminder({ ...newReminder, description: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500"
+                rows="2"
+              />
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">Date et heure du rappel *</label>
+                <input
+                  type="datetime-local" required
+                  value={newReminder.remindAt}
+                  onChange={(e) => setNewReminder({ ...newReminder, remindAt: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">Rappeler avant (minutes)</label>
+                <input
+                  type="number" min="0" max="1440"
+                  value={newReminder.remindBeforeMinutes}
+                  onChange={(e) => setNewReminder({ ...newReminder, remindBeforeMinutes: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2 border-t border-slate-800">
+              <button type="button" onClick={() => setShowReminderModal(false)} className="flex-1 py-2.5 border border-slate-800 rounded-xl text-xs text-slate-400 hover:text-white">Annuler</button>
+              <button type="submit" className="flex-1 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold rounded-xl text-xs">Créer le Rappel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= PANNEAU DE MESSAGERIE ================= */}
+      <ChatPanel
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
+
+      {/* ================= FACTURES ================= */}
+      {showInvoices && (
+        <InvoicePanel onClose={() => setShowInvoices(false)} />
+      )}
+
+      {/* ================= CALENDRIER ================= */}
+      {showCalendar && (
+        <CalendarPanel onClose={() => setShowCalendar(false)} />
+      )}
+
+      {/* ================= RECHERCHE GLOBALE ================= */}
+      {showSearch && (
+        <GlobalSearch
+          onClose={() => setShowSearch(false)}
+          onNavigate={(category, id, data) => {
+            console.log('Navigate to', category, id);
+          }}
+        />
       )}
 
     </div>

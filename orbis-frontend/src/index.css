@@ -126,14 +126,56 @@ html:not(.dark) .bg-slate-900\/10,
 html:not(.dark) .bg-slate-900\/5,
 html:not(.dark) .bg-slate-950\/20,
 html:not(.dark) .bg-slate-950\/10,
-html:not(.dark) .bg-slate-950\/80:not(nav) {
+html:not(.dark) .bg-slate-950\/80,
+html:not(.dark) .bg-slate-950\/95,
+html:not(.dark) .bg-slate-950\/60 {
   background-color: #f1f5f9 !important; /* slate-100 */
 }
 
-/* Barre de navigation */
-html:not(.dark) nav.bg-slate-950\/80 {
-  background-color: rgba(255, 255, 255, 0.8) !important;
-  border-bottom: 1px solid #e2e8f0 !important;
+/* Barre de navigation sticky */
+html:not(.dark) nav.sticky,
+html:not(.dark) nav.sticky > div {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html:not(.dark) nav.sticky {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+/* Menu mobile - fond blanc en mode clair */
+html:not(.dark) [class*="md:hidden"][class*="animate-fadeIn"],
+html:not(.dark) [class*="md:hidden"][class*="border-t"][class*="px-4"] {
+  background-color: #ffffff !important;
+  border-top-color: #e2e8f0 !important;
+}
+
+/* Éléments du menu mobile en mode clair */
+html:not(.dark) [class*="md:hidden"] [class*="bg-slate-900\/60"],
+html:not(.dark) [class*="md:hidden"] [class*="bg-slate-900"][class*="border-slate-800"] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html:not(.dark) [class*="md:hidden"] .text-slate-200,
+html:not(.dark) [class*="md:hidden"] .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html:not(.dark) [class*="md:hidden"] .hover\:bg-slate-800\/40:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html:not(.dark) [class*="md:hidden"] [class*="border-slate-800\/60"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* Bouton Déconnexion dans menu mobile */
+html:not(.dark) [class*="md:hidden"] .bg-rose-500\/10 {
+  background-color: rgba(244, 63, 94, 0.05) !important;
+}
+
+html:not(.dark) [class*="md:hidden"] .border-rose-500\/20 {
+  border-color: rgba(244, 63, 94, 0.1) !important;
 }
 
 /* Boutons secondaires et états au survol */
@@ -276,4 +318,67 @@ html, body, #root {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ============================================================
+   AMÉLIORATIONS RESPONSIVE MOBILE V2
+   ============================================================ */
+
+/* Modals : plein écran sur mobile */
+@media (max-width: 640px) {
+  .fixed.inset-0.z-50 > div,
+  .fixed.inset-0.z-50 > form,
+  .fixed.inset-0.z-50 > .w-full {
+    max-width: 100% !important;
+    width: calc(100% - 16px) !important;
+    margin-left: 8px;
+    margin-right: 8px;
+    border-radius: 16px !important;
+    max-height: 90vh !important;
+    overflow-y: auto;
+  }
+
+  /* Ajustements généraux */
+  h1.text-2xl {
+    font-size: 1.1rem !important;
+  }
+
+  .text-3xl.font-extrabold {
+    font-size: 1.5rem !important;
+  }
+
+  /* Grilles en colonne unique */
+  .grid-cols-1.md\:grid-cols-3,
+  .grid-cols-1.md\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Réduction padding interne */
+  .p-6 {
+    padding: 1rem !important;
+  }
+
+  /* Tableaux responsives */
+  .overflow-x-auto table {
+    min-width: 500px;
+  }
+
+  /* Navigation tabs: cacher en mobile */
+  nav .hidden.md\:flex {
+    display: none !important;
+  }
+}
+
+/* Amélioration du scroll sur mobile */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+  }
+}
+
+
 

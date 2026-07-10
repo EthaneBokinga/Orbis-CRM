@@ -21,5 +21,15 @@ router.get('/logs', adminController.getAuditLogs);
 router.get('/settings', adminController.getSettings);
 router.put('/settings/goal', adminController.updateGoal);
 
+// Statistiques avancées des deals par agent (admin uniquement)
+router.get('/deals/stats', adminController.getDealStatsByAgent);
+
+// Performances & Classements
+router.get('/performances/top', adminController.getTopPerformers);
+router.get('/performances/late-followups', adminController.getLateFollowups);
+
+// Historique des objectifs
+router.get('/goals/history', adminController.getGoalHistory);
+
 module.exports = router;
 
