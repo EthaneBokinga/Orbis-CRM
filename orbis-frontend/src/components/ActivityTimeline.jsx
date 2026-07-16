@@ -21,8 +21,15 @@ function timeAgo(date) {
   return `il y a ${Math.floor(diff / 86400)} j`;
 }
 
-function getAuthHeader(isJson = true) {
-  return isJson ? { credentials: 'include', headers: { 'Content-Type': 'application/json' } } : { credentials: 'include' };
+function getAuthHeader(isJson = false) {
+  const token = localStorage.getItem('token');
+  return {
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(isJson ? { 'Content-Type': 'application/json' } : {})
+    }
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -49,9 +56,7 @@ export default function ActivityTimeline({ dealId, dealTitle, onClose }) {
     if (!dealId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/activities/${dealId}`, {
-        headers: { ...getAuthHeader() }
-      });
+      const res = await fetch(`${API_URL}/activities/${dealId}`, getAuthHeader());
       if (!res.ok) throw new Error();
       setActivities(await res.json());
     } catch {
@@ -71,7 +76,7 @@ export default function ActivityTimeline({ dealId, dealTitle, onClose }) {
     try {
       const res = await fetch(`${API_URL}/activities`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        ...getAuthHeader(true),
         body: JSON.stringify({ ...form, dealId })
       });
       const data = await res.json();
