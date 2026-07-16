@@ -34,11 +34,8 @@ app.use(cookieParser());
 
 // Connexion Mongoose Atlas
 connectDB().then(() => {
-  // ═══════════════════════════════════════════════════════
-  // SEEDER DE SECOURS AUTOMATIQUE (Self-healing Admin)
-  // Directive: Si aucun admin n'existe au démarrage, en créer un
-  // ═══════════════════════════════════════════════════════
   seedAdminIfMissing();
+  seedSettingsReset();
 });
 
 async function seedAdminIfMissing() {
@@ -93,6 +90,25 @@ async function seedAdminIfMissing() {
     }
   } catch (err) {
     console.error('=== ORBIS SEEDER === ✗ Erreur :', err.message);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// RESET OBJECTIFS À ZÉRO (one-shot au démarrage)
+// Remet weeklyGoal, monthlyGoal, yearlyGoal à 0
+// L'admin les reconfigurera depuis l'interface
+// ══════════════════════════════════════════════════
+async function seedSettingsReset() {
+  try {
+    const Settings = require('./models/Settings');
+    await Settings.findOneAndUpdate(
+      {},
+      { weeklyGoal: 0, monthlyGoal: 0, yearlyGoal: 0 },
+      { upsert: true, new: true }
+    );
+    console.log('=== ORBIS SEEDER === ✓ Objectifs réinitialisés à 0.');
+  } catch (err) {
+    console.error('=== ORBIS SEEDER === ✗ Erreur reset Settings :', err.message);
   }
 }
 

@@ -13,6 +13,11 @@ const API_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/crm/admin` 
   : "http://localhost:5001/api/crm/admin";
 
+// URL de base CRM (sans /admin) pour les routes partagées
+const CRM_BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/crm` 
+  : "http://localhost:5001/api/crm";
+
 const API_AUTH_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/auth` 
   : "http://localhost:5001/api/auth";
@@ -157,9 +162,10 @@ export default function AdminDashboard() {
   };
 
   // === CHARGEMENT DE LA PROGRESSION DES OBJECTIFS ===
+  // NOTE : la route /goals/progress est sous /crm (partagée), pas sous /crm/admin
   const fetchGoalsProgress = async () => {
     try {
-      const res = await fetch(`${API_URL}/goals/progress`, getAuthHeader());
+      const res = await fetch(`${CRM_BASE_URL}/goals/progress`, getAuthHeader());
       if (res.ok) {
         const data = await res.json();
         setGoalsProgress(data);
@@ -185,7 +191,7 @@ export default function AdminDashboard() {
       const [resTop, resLate, resHistory] = await Promise.all([
         fetch(`${API_URL}/performances/top`, getAuthHeader()),
         fetch(`${API_URL}/performances/late-followups`, getAuthHeader()),
-        fetch(`${API_URL}/goals/history`, getAuthHeader())
+        fetch(`${CRM_BASE_URL}/goals/history`, getAuthHeader())
       ]);
       if (resTop.ok) setTopPerformers(await resTop.json());
       if (resLate.ok) setLateFollowups(await resLate.json());

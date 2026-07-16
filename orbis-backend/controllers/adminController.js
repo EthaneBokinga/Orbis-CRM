@@ -456,8 +456,8 @@ exports.updateGoal = async (req, res) => {
   try {
     const { goal, period, note } = req.body; // period = 'weekly' | 'monthly' | 'yearly'
     const goalValue = Number(goal);
-    if (!goalValue || goalValue <= 0) {
-      return res.status(400).json({ error: "Objectif invalide." });
+    if (isNaN(goalValue) || goalValue < 0) {
+      return res.status(400).json({ error: "Objectif invalide. Veuillez entrer un nombre positif ou 0." });
     }
     const allowedPeriods = ['weekly', 'monthly', 'yearly'];
     const targetPeriod = allowedPeriods.includes(period) ? period : 'monthly';

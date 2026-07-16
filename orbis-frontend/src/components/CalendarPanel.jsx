@@ -19,6 +19,17 @@ const API_EVENTS = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/events`
   : 'http://localhost:5001/api/events';
 
+const getAuthOpts = (isJson = false) => {
+  const token = localStorage.getItem('token');
+  return {
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(isJson ? { 'Content-Type': 'application/json' } : {})
+    }
+  };
+};
+
 // === COULEURS PAR TYPE D'ÉVÉNEMENT ===
 const TYPE_COLORS = {
   rdv: '#0d9488',      // teal
@@ -60,8 +71,6 @@ function EventFormModal({ event, onClose, onSave, onDelete, onRefresh }) {
     setLoading(true);
     setError('');
 
-    const authOpts = { credentials: 'include', headers: { 'Content-Type': 'application/json' } };
-
     try {
       const body = {
         title: title.trim(),
@@ -76,13 +85,13 @@ function EventFormModal({ event, onClose, onSave, onDelete, onRefresh }) {
       if (event?._id) {
         // Update
         const res = await fetch(`${API_EVENTS}/${event._id}`, {
-          method: 'PUT', ...authOpts, body: JSON.stringify(body)
+          method: 'PUT', ...getAuthOpts(true), body: JSON.stringify(body)
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Erreur modification.');
       } else {
         // Create
         const res = await fetch(API_EVENTS, {
-          method: 'POST', ...authOpts, body: JSON.stringify(body)
+          method: 'POST', ...getAuthOpts(true), body: JSON.stringify(body)
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Erreur création.');
       }
@@ -102,7 +111,7 @@ function EventFormModal({ event, onClose, onSave, onDelete, onRefresh }) {
     setLoading(true);
     try {
       await fetch(`${API_EVENTS}/${event._id}`, {
-        method: 'DELETE', credentials: 'include'
+        method: 'DELETE', ...getAuthOpts()
       });
       onRefresh();
       onClose();
@@ -216,11 +225,17 @@ export default function CalendarPanel({ onClose }) {
       const end = new Date(date.getFullYear(), date.getMonth() + 2, 0);
       const res = await fetch(
         `${API_EVENTS}?start=${start.toISOString()}&end=${end.toISOString()}`,
-        { credentials: 'include' }
+        getAuthOpts()
       );
       if (res.ok) {
         const data = await res.json();
-        setEvents(data);
+        // Convert dates from ISO strings to JavaScript Date objects for react-big-calendar compatibility
+        const parsedEvents = data.map(evt => ({
+          ...evt,
+          start: new Date(evt.start),
+          end: new Date(evt.end)
+        }));
+        setEvents(parsedEvents);
       }
     } catch (err) {
       console.error('Erreur chargement calendrier:', err);

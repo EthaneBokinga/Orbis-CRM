@@ -120,8 +120,8 @@ export default function App() {
                   {/* REDIRECTION AUTOMATIQUE : Toute URL inconnue → Login */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+                <PWAInstallBanner />
               </BrowserRouter>
-              <PWAInstallBanner />
             </>
           )}
         </ToastProvider>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Download, Smartphone, X } from 'lucide-react';
 
 const isIOSDevice = () =>
@@ -12,13 +13,21 @@ const isInStandaloneMode = () =>
   window.navigator.standalone;
 
 export default function PWAInstallBanner() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const location = useLocation();
+  const [deferredPrompt, setDeferredPrompt] = useState(window.deferredPrompt || null);
   const [platform, setPlatform] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showFallbackInstructions, setShowFallbackInstructions] = useState(false);
 
+  // Masquer la bannière sur la page de connexion ou s'il n'y a pas de token
+  const isAuthPage = location.pathname === '/';
+  const hasToken = !!localStorage.getItem('token');
+
   useEffect(() => {
-    if (isInStandaloneMode()) return;
+    if (isInStandaloneMode() || isAuthPage || !hasToken) {
+      setPlatform(null);
+      return;
+    }
 
     if (isIOSDevice()) {
       setPlatform('ios');
@@ -31,28 +40,41 @@ export default function PWAInstallBanner() {
     }
 
     setPlatform('desktop');
-  }, []);
+  }, [location.pathname, hasToken]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event) => {
       event.preventDefault();
       setDeferredPrompt(event);
-      setPlatform('android');
+      if (!isInStandaloneMode() && !isAuthPage && hasToken) {
+        setPlatform('android');
+      }
+    };
+
+    const handleCustomPrompt = (event) => {
+      const promptEvent = event.detail;
+      setDeferredPrompt(promptEvent);
+      if (!isInStandaloneMode() && !isAuthPage && hasToken) {
+        setPlatform('android');
+      }
     };
 
     const handleAppInstalled = () => {
       setPlatform(null);
       setDeferredPrompt(null);
+      window.deferredPrompt = null;
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('orbis-beforeinstallprompt', handleCustomPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('orbis-beforeinstallprompt', handleCustomPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [isAuthPage, hasToken]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
@@ -60,12 +82,18 @@ export default function PWAInstallBanner() {
       return;
     }
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
 
-    if (outcome === 'accepted') {
-      setPlatform(null);
-      setDeferredPrompt(null);
+      if (outcome === 'accepted') {
+        setPlatform(null);
+        setDeferredPrompt(null);
+        window.deferredPrompt = null;
+      }
+    } catch (err) {
+      console.warn("Prompt d'installation PWA rejeté ou bloqué :", err);
+      setShowFallbackInstructions(true);
     }
   };
 
